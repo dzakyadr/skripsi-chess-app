@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-g">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload PGN File</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; }
+        .messages { list-style-type: none; padding: 0; margin-bottom: 1em; }
+        .messages li.success { color: green; }
+        .messages li.error { color: red; }
+        .messages li.warning { color: orange; }
+    </style>
+</head>
+<body>
+
+    <h1>Upload File PGN</h1>
+    <p>Pilih sebuah file PGN (.pgn) yang berisi satu atau lebih permainan catur.</p>
+    
+    {% if messages %}
+        <ul class="messages">
+            {% for message in messages %}
+                <li class="{{ message.tags }}">{{ message }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form.as_p }}  <button type="submit">Upload File</button>
+    </form>
+
+</body>
+</html>
