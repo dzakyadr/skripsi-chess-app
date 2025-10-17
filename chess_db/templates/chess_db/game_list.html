@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Daftar Permainan Catur</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>Database Permainan Catur</h1>
+    <p><a href="{% url 'upload_pgn' %}">Upload PGN Baru</a></p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>No.</th>
+                <th>Pemain (Putih vs Hitam)</th>
+                <th>Hasil</th>
+                <th>Event</th>
+                <th>Tanggal</th>
+            </tr>
+        </thead>
+        <tbody>
+    {% for game in games %}
+    <tr>
+        <td><a href="{% url 'game_detail' game.id %}">{{ forloop.counter }}</a></td>
+        <td><a href="{% url 'game_detail' game.id %}">{{ game.white_player }} vs {{ game.black_player }}</a></td>
+        <td>{{ game.get_result_display }}</td>
+        <td>{{ game.event }}</td>
+        <td>{{ game.game_date }}</td>
+    </tr>
+    {% empty %}
+    {% endfor %}
+</tbody>
+    </table>
+
+</body>
+</html>

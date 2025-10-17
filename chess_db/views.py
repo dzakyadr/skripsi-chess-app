@@ -7,6 +7,7 @@ from .models import Game
 import chess.pgn
 import io
 from datetime import datetime
+from django.shortcuts import render, redirect, get_object_or_404
 
 def upload_pgn(request):
     if request.method == 'POST':
@@ -71,3 +72,25 @@ def upload_pgn(request):
         form = UploadPgnForm()
 
     return render(request, 'chess_db/upload_pgn.html', {'form': form})
+
+def game_list(request):
+    # Ambil semua objek Game dari database, urutkan dari yang terbaru
+    all_games = Game.objects.all() 
+    
+    # Siapkan data untuk dikirim ke template
+    context = {
+        'games': all_games
+    }
+    
+    # Render (tampilkan) file HTML dengan data yang sudah disiapkan
+    return render(request, 'chess_db/game_list.html', context)
+
+def game_detail(request, game_id):
+    # Ambil satu objek Game berdasarkan ID-nya. Jika tidak ada, tampilkan halaman 404.
+    game = get_object_or_404(Game, pk=game_id)
+    
+    context = {
+        'game': game
+    }
+    
+    return render(request, 'chess_db/game_detail.html', context)

@@ -1,0 +1,56 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Detail Permainan</title>
+    <link rel="stylesheet" href="{% static 'assets/chessboard.css' %}"/>
+    <style>
+        body { font-family: sans-serif; margin: 2em; display: flex; gap: 2em; }
+        .game-info { flex-basis: 350px; flex-shrink: 0; }
+        .game-info p { margin: 0.5em 0; }
+        .game-info strong { display: inline-block; width: 120px; }
+        .chessboard-container { flex-grow: 1; max-width: 600px; }
+    </style>
+</head>
+<body>
+    <div class="game-info">
+        <p><a href="{% url 'game_list' %}">&larr; Kembali ke Daftar Game</a></p>
+        <h2>{{ game.white_player }} vs {{ game.black_player }}</h2>
+        <p><strong>Event:</strong> {{ game.event }}</p><p><strong>Site:</strong> {{ game.site }}</p><p><strong>Date:</strong> {{ game.game_date }}</p><p><strong>Result:</strong> {{ game.get_result_display }}</p><p><strong>White ELO:</strong> {{ game.white_elo|default:"N/A" }}</p><p><strong>Black ELO:</strong> {{ game.black_elo|default:"N/A" }}</p><p><strong>Opening:</strong> {{ game.opening|default:"N/A" }} ({{ game.eco_code|default:"N/A" }})</p>
+    </div>
+    <div class="chessboard-container" id="board-container"></div>
+
+    {{ game.pgn|json_script:"pgn-data" }}
+
+    <script type="importmap">
+    {
+        "imports": {
+            "cm-chessboard": "{% static 'src/Chessboard.js' %}"
+        }
+    }
+    </script>
+
+    <script type="module">
+        // Import Chessboard dan juga ekstensi Pgn
+        import {Chessboard} from "cm-chessboard"
+        
+       
+        // --- PERBAIKAN KUNCI ADA DI SINI ---
+        
+        // 2. Beritahu library di mana lokasi aset-asetnya (termasuk gambar buah catur)
+        const props = {
+            sprite: {
+                url: "{% static 'assets/pieces/standard.svg' %}" 
+            }
+        }
+        
+        // 3. Buat Papan Catur adengan properti yang sudah kita siapkan
+        const board = new Chessboard(container, props);
+        
+        // 4. Muat PGN menggunakan ekstensi Pgn dengan cara yang benar
+      
+
+    </script>
+</body>
+</html>
