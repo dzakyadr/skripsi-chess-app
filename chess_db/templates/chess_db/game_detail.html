@@ -1,56 +1,80 @@
 {% load static %}
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Detail Permainan</title>
-    <link rel="stylesheet" href="{% static 'assets/chessboard.css' %}"/>
-    <style>
-        body { font-family: sans-serif; margin: 2em; display: flex; gap: 2em; }
-        .game-info { flex-basis: 350px; flex-shrink: 0; }
-        .game-info p { margin: 0.5em 0; }
-        .game-info strong { display: inline-block; width: 120px; }
-        .chessboard-container { flex-grow: 1; max-width: 600px; }
-    </style>
+  <meta charset="utf-8" />
+  <title>Detail Permainan</title>
+  <link rel="stylesheet" href="{% static 'assets/chessboard.css' %}"/>
+  <style>
+    body { font-family: sans-serif; margin: 2em; display:flex; gap:2em; }
+    .game-info { flex-basis: 320px; }
+    .chessboard-container { flex-grow: 1; max-width: 640px; }
+    #board { width: 560px; height:560px; }
+  </style>
 </head>
 <body>
-    <div class="game-info">
-        <p><a href="{% url 'game_list' %}">&larr; Kembali ke Daftar Game</a></p>
-        <h2>{{ game.white_player }} vs {{ game.black_player }}</h2>
-        <p><strong>Event:</strong> {{ game.event }}</p><p><strong>Site:</strong> {{ game.site }}</p><p><strong>Date:</strong> {{ game.game_date }}</p><p><strong>Result:</strong> {{ game.get_result_display }}</p><p><strong>White ELO:</strong> {{ game.white_elo|default:"N/A" }}</p><p><strong>Black ELO:</strong> {{ game.black_elo|default:"N/A" }}</p><p><strong>Opening:</strong> {{ game.opening|default:"N/A" }} ({{ game.eco_code|default:"N/A" }})</p>
+  <div class="game-info">
+    <h3>{{ game.title }}</h3>
+    <p><strong>White:</strong> {{ game.white }}</p>
+    <p><strong>Black:</strong> {{ game.black }}</p>
+    <p><strong>Result:</strong> {{ game.result }}</p>
+  </div>
+
+  <div class="chessboard-container">
+    <div id="board" aria-label="chessboard"></div>
+    <div style="margin-top: 12px;">
+      <button id="prevBtn">Prev</button>
+      <button id="nextBtn">Next</button>
+      <span id="moveIndex">0</span> / <span id="moveCount">0</span>
     </div>
-    <div class="chessboard-container" id="board-container"></div>
+  </div>
 
-    {{ game.pgn|json_script:"pgn-data" }}
+ <script type="module">
+  // import ESM bundles yang pasti ada di CDN (unpkg)
+  import { Chessboard } from "https://unpkg.com/cm-chessboard@8.10.1/dist/cm-chessboard.esm.js";
+  import { FEN } from "https://unpkg.com/cm-chessboard@8.10.1/dist/cm-chessboard.esm.js";
+  import { Chess } from "https://unpkg.com/chess.js@1.0.0-beta.1/dist/chess.mjs";
 
-    <script type="importmap">
-    {
-        "imports": {
-            "cm-chessboard": "{% static 'src/Chessboard.js' %}"
-        }
+  document.addEventListener("DOMContentLoaded", () => {
+    const container = document.getElementById("board");
+    const game = new Chess();
+    const pgn = `{{ game.pgn_text|escapejs }}` || "";
+
+    try { if (pgn.trim()) game.load_pgn(pgn); } catch(e){ console.warn("PGN load error", e); }
+
+    const replay = new Chess();
+    const fenList = [ replay.fen() ];
+    try {
+      if (pgn.trim()) {
+        replay.load_pgn(pgn);
+        const sanList = replay.history();
+        const r2 = new Chess();
+        fenList.length = 0;
+        fenList.push(r2.fen());
+        for (const m of sanList) { r2.move(m); fenList.push(r2.fen()); }
+      }
+    } catch(e){ console.warn("fenList build failed", e); }
+
+    const board = new Chessboard(container, {
+      position: fenList[0] || FEN.start,
+      sprite: { url: "https://shaack.com/projekte/cm-chessboard/assets/images/chessboard-sprite.svg" },
+      draggable: false
+    });
+
+    // controls
+    let idx = 0;
+    function setIndex(i){
+      idx = Math.min(Math.max(0, i), fenList.length-1);
+      board.setPosition(fenList[idx]);
+      document.getElementById("moveIndex").textContent = idx;
     }
-    </script>
+    document.getElementById("prevBtn").addEventListener("click", ()=>setIndex(idx-1));
+    document.getElementById("nextBtn").addEventListener("click", ()=>setIndex(idx+1));
+    document.getElementById("moveCount").textContent = Math.max(0, fenList.length-1);
+    setIndex(0);
+  });
+</script>
 
-    <script type="module">
-        // Import Chessboard dan juga ekstensi Pgn
-        import {Chessboard} from "cm-chessboard"
-        
-       
-        // --- PERBAIKAN KUNCI ADA DI SINI ---
-        
-        // 2. Beritahu library di mana lokasi aset-asetnya (termasuk gambar buah catur)
-        const props = {
-            sprite: {
-                url: "{% static 'assets/pieces/standard.svg' %}" 
-            }
-        }
-        
-        // 3. Buat Papan Catur adengan properti yang sudah kita siapkan
-        const board = new Chessboard(container, props);
-        
-        // 4. Muat PGN menggunakan ekstensi Pgn dengan cara yang benar
-      
 
-    </script>
 </body>
 </html>
