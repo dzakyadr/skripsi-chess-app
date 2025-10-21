@@ -1,80 +1,106 @@
+{% extends "base.html" %}
 {% load static %}
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>Detail Permainan</title>
-  <link rel="stylesheet" href="{% static 'assets/chessboard.css' %}"/>
-  <style>
-    body { font-family: sans-serif; margin: 2em; display:flex; gap:2em; }
-    .game-info { flex-basis: 320px; }
-    .chessboard-container { flex-grow: 1; max-width: 640px; }
-    #board { width: 560px; height:560px; }
-  </style>
-</head>
-<body>
-  <div class="game-info">
-    <h3>{{ game.title }}</h3>
-    <p><strong>White:</strong> {{ game.white }}</p>
-    <p><strong>Black:</strong> {{ game.black }}</p>
-    <p><strong>Result:</strong> {{ game.result }}</p>
-  </div>
+{% block title %}{{ game.white_player }} vs {{ game.black_player }}{% endblock %}
 
-  <div class="chessboard-container">
-    <div id="board" aria-label="chessboard"></div>
-    <div style="margin-top: 12px;">
+{% block content %}
+<h1>{{ game.white_player }} vs {{ game.black_player }}</h1>
+<p><strong>Event:</strong> {{ game.event|default:"-" }} • <strong>Date:</strong> {{ game.game_date|default:"-" }}</p>
+<p><strong>Result:</strong> {{ game.result|default:"-" }}</p>
+
+<div style="display:flex; gap:24px; align-items:flex-start;">
+  <div>
+    <link rel="stylesheet" href="{% static 'assets/chessboard.css' %}"/>
+
+    <div id="board" style="width:520px; height:520px; border:1px solid #ddd;"></div>
+    <div style="margin-top:8px;">
       <button id="prevBtn">Prev</button>
       <button id="nextBtn">Next</button>
-      <span id="moveIndex">0</span> / <span id="moveCount">0</span>
+      <button id="playBtn">Play</button>
+      <label style="margin-left:8px;"><input type="checkbox" id="draggableToggle"> Enable moves</label>
+    </div>
+    <div style="margin-top:8px;">
+      Move: <span id="moveIndex">0</span> / <span id="moveCount">0</span>
+      <input id="moveRange" type="range" min="0" max="0" value="0" style="width:300px; margin-left:8px;">
     </div>
   </div>
+  <div style="flex:1;">
+    <h3>PGN</h3>
+    <pre style="background:#f7f7f7; padding:8px; border-radius:4px; max-height:480px; overflow:auto;">{{ game.pgn|default:"(no pgn)" }}</pre>
+  </div>
+</div>
 
- <script type="module">
-  // import ESM bundles yang pasti ada di CDN (unpkg)
-  import { Chessboard } from "https://unpkg.com/cm-chessboard@8.10.1/dist/cm-chessboard.esm.js";
-  import { FEN } from "https://unpkg.com/cm-chessboard@8.10.1/dist/cm-chessboard.esm.js";
-  import { Chess } from "https://unpkg.com/chess.js@1.0.0-beta.1/dist/chess.mjs";
+{{ fen_list|json_script:"fen-list-data" }} <script type="module">
+    // 2. Import HANYA Chessboard LANGSUNG dari static/src/ (Path Benar)
+    import {Chessboard} from "{% static 'src/Chessboard.js' %}";
+    // Kita TIDAK mengimpor Pgn atau Chess.js lagi
 
-  document.addEventListener("DOMContentLoaded", () => {
-    const container = document.getElementById("board");
-    const game = new Chess();
-    const pgn = `{{ game.pgn_text|escapejs }}` || "";
+    // Ambil FEN list dari Django
+    const fenListRaw = JSON.parse(document.getElementById('fen-list-data').textContent) || [];
+    const validFenList = (Array.isArray(fenListRaw) && fenListRaw.length) ? fenListRaw : ["start"];
+    const container = document.getElementById('board');
 
-    try { if (pgn.trim()) game.load_pgn(pgn); } catch(e){ console.warn("PGN load error", e); }
+    // 3. Sprite SVG tetap di static/assets/pieces/ (Path Benar)
+    const spriteUrl = "{% static 'assets/pieces/standard.svg' %}"; // Pastikan file ini ada
 
-    const replay = new Chess();
-    const fenList = [ replay.fen() ];
-    try {
-      if (pgn.trim()) {
-        replay.load_pgn(pgn);
-        const sanList = replay.history();
-        const r2 = new Chess();
-        fenList.length = 0;
-        fenList.push(r2.fen());
-        for (const m of sanList) { r2.move(m); fenList.push(r2.fen()); }
-      }
-    } catch(e){ console.warn("fenList build failed", e); }
-
+    // 4. Buat papan catur dengan file sprite
     const board = new Chessboard(container, {
-      position: fenList[0] || FEN.start,
-      sprite: { url: "https://shaack.com/projekte/cm-chessboard/assets/images/chessboard-sprite.svg" },
-      draggable: false
+        position: validFenList[0], // Tampilkan posisi awal dari FEN list
+        assetsUrl: "{% static '/' %}", // Beritahu base URL untuk aset internal
+        style: {
+            pieces: {
+                // Beritahu path file sprite relatif dari assetsUrl
+                file: "assets/pieces/standard.svg"
+            }
+        },
+        draggable: false
     });
 
-    // controls
+    // --- Logika UI & Navigasi (Tetap Sama, menggunakan FEN list) ---
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const playBtn = document.getElementById('playBtn');
+    const moveIndexEl = document.getElementById('moveIndex');
+    const moveCountEl = document.getElementById('moveCount');
+    const moveRange = document.getElementById('moveRange');
+    const draggableToggle = document.getElementById('draggableToggle');
+
     let idx = 0;
+    const maxMoves = Math.max(0, validFenList.length - 1);
+    moveCountEl.textContent = maxMoves;
+    moveIndexEl.textContent = idx;
+    moveRange.min = 0;
+    moveRange.max = maxMoves;
+    moveRange.value = 0;
+
     function setIndex(i){
-      idx = Math.min(Math.max(0, i), fenList.length-1);
-      board.setPosition(fenList[idx]);
-      document.getElementById("moveIndex").textContent = idx;
+        idx = Math.max(0, Math.min(i, maxMoves));
+        if (validFenList[idx]) {
+            // Gunakan setPosition untuk menampilkan FEN dari list
+            board.setPosition(validFenList[idx], true); // true untuk animasi
+        }
+        moveIndexEl.textContent = idx;
+        moveRange.value = idx;
     }
-    document.getElementById("prevBtn").addEventListener("click", ()=>setIndex(idx-1));
-    document.getElementById("nextBtn").addEventListener("click", ()=>setIndex(idx+1));
-    document.getElementById("moveCount").textContent = Math.max(0, fenList.length-1);
-    setIndex(0);
-  });
+
+    prevBtn.addEventListener('click', () => setIndex(idx - 1));
+    nextBtn.addEventListener('click', () => setIndex(idx + 1));
+    moveRange.addEventListener('input', (e) => setIndex(parseInt(e.target.value, 10)));
+
+    let playInterval = null;
+    playBtn.addEventListener('click', () => {
+        if (playInterval) { clearInterval(playInterval); playInterval = null; playBtn.textContent = 'Play'; return; }
+        playBtn.textContent = 'Pause';
+        playInterval = setInterval(() => {
+            if (idx < maxMoves) setIndex(idx + 1);
+            else { clearInterval(playInterval); playInterval = null; playBtn.textContent = 'Play'; }
+        }, 800);
+    });
+
+    draggableToggle.addEventListener('change', (ev) => {
+        board.setOptions({ draggable: ev.target.checked });
+    });
+
+    setIndex(0); // Tampilkan posisi awal
 </script>
 
-
-</body>
-</html>
+{% endblock %}

@@ -1,34 +1,78 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-g">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Upload PGN File</title>
-    <style>
-        body { font-family: sans-serif; margin: 2em; }
-        .messages { list-style-type: none; padding: 0; margin-bottom: 1em; }
-        .messages li.success { color: green; }
-        .messages li.error { color: red; }
-        .messages li.warning { color: orange; }
-    </style>
-</head>
-<body>
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+<h1>Upload PGN</h1>
 
-    <h1>Upload File PGN</h1>
-    <p>Pilih sebuah file PGN (.pgn) yang berisi satu atau lebih permainan catur.</p>
-    
-    {% if messages %}
-        <ul class="messages">
-            {% for message in messages %}
-                <li class="{{ message.tags }}">{{ message }}</li>
-            {% endfor %}
-        </ul>
-    {% endif %}
+<!-- Pesan dari Django messages framework -->
+{% if messages %}
+  <ul class="messages">
+    {% for message in messages %}
+      <li class="{{ message.tags }}">{{ message }}</li>
+    {% endfor %}
+  </ul>
+{% endif %}
 
-    <form method="post" enctype="multipart/form-data">
-        {% csrf_token %}
-        {{ form.as_p }}  <button type="submit">Upload File</button>
-    </form>
+<!-- Form upload -->
+<form method="post" enctype="multipart/form-data" id="uploadForm">
+  {% csrf_token %}
+  <p>
+    {{ form.pgn_file.label_tag }}
+    {{ form.pgn_file }}
+  </p>
+  <p><button type="submit">Upload PGN</button></p>
+</form>
 
-</body>
-</html>
+<hr>
+
+<p><a href="{% url 'game_list' %}">Kembali ke Daftar Permainan</a></p>
+
+<!-- Optional: contoh PGN kecil agar user bisa coba (tidak wajib) -->
+<details style="margin-top:1em;">
+  <summary><strong>Contoh PGN (klik untuk lihat)</strong></summary>
+  <pre style="background:#f8f8f8; padding:8px; border-radius:4px;">
+[Event "Demo"]
+[Site "Local"]
+[Date "2025.10.01"]
+[Round "1"]
+[White "White"]
+[Black "Black"]
+[Result "1-0"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 1-0
+  </pre>
+</details>
+
+
+<style>
+  body { font-family: sans-serif; }
+  .messages { list-style-type: none; padding: 0; margin: 0 0 1em 0; }
+  .messages li.success { color: green; }
+  .messages li.error { color: red; }
+  .messages li.warning { color: orange; }
+  #uploadForm { max-width: 640px; }
+  pre { background:#f8f8f8; padding:8px; border-radius:4px; }
+</style>
+
+<script>
+  // UX nicety: tampilkan nama file saat user pilih file
+  document.addEventListener('DOMContentLoaded', function() {
+    const fileInput = document.querySelector('input[type="file"][name="pgn_file"]');
+    if (!fileInput) return;
+    const label = fileInput.previousElementSibling || null;
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files.length) {
+        const name = e.target.files[0].name;
+        const info = document.createElement('div');
+        info.style.marginTop = '8px';
+        info.textContent = 'File pilih: ' + name;
+        // replace previous info if ada
+        const prev = document.getElementById('fileSelectedInfo');
+        if (prev) prev.remove();
+        info.id = 'fileSelectedInfo';
+        fileInput.parentNode.appendChild(info);
+      }
+    });
+  });
+</script>
+
+{% endblock %}

@@ -1,42 +1,57 @@
-# chess_db/models.py
+# Di dalam chess_db/models.py
 
 from django.db import models
 
 class Game(models.Model):
-    # Informasi umum tentang pertandingan
-    event = models.CharField(max_length=100, blank=True, null=True, help_text="Nama turnamen atau event")
-    site = models.CharField(max_length=100, blank=True, null=True, help_text="Lokasi pertandingan")
-    game_date = models.DateField(help_text="Tanggal permainan dimainkan")
-    round = models.CharField(max_length=10, blank=True, null=True, help_text="Babak ke berapa")
-
-    # Informasi pemain
-    white_player = models.CharField(max_length=100, help_text="Nama pemain Putih")
-    black_player = models.CharField(max_length=100, help_text="Nama pemain Hitam")
-    white_elo = models.IntegerField(blank=True, null=True, help_text="Rating ELO pemain Putih")
-    black_elo = models.IntegerField(blank=True, null=True, help_text="Rating ELO pemain Hitam")
-
-    # Hasil dan data permainan
+    # --- Ini kita kembalikan, sangat penting untuk filter! ---
     RESULT_CHOICES = [
-        ('1-0', 'White Wins'),
-        ('0-1', 'Black Wins'),
-        ('1/2-1/2', 'Draw'),
-        ('*', 'Ongoing/Unknown'),
+        ('1-0', 'Putih Menang'),
+        ('0-1', 'Hitam Menang'),
+        ('1/2-1/2', 'Remis'),
+        ('*', 'Lainnya/Belum Selesai'),
     ]
-    result = models.CharField(max_length=10, choices=RESULT_CHOICES, help_text="Hasil akhir permainan")
-    
-    # Kolom ini akan menyimpan seluruh notasi permainan dalam format PGN
-    pgn = models.TextField(help_text="Notasi permainan lengkap dalam format PGN")
 
-    # Informasi tambahan (opsional tapi sangat berguna)
-    eco_code = models.CharField(max_length=10, blank=True, null=True, help_text="Kode ECO pembukaan catur")
-    opening = models.CharField(max_length=150, blank=True, null=True, help_text="Nama pembukaan catur")
+    # Basic info (sudah bagus)
+    event = models.CharField(max_length=100, blank=True, null=True)
+    site = models.CharField(max_length=100, blank=True, null=True)
+    game_date = models.DateField(blank=True, null=True) # Perubahan bagusmu tetap di sini
+    round = models.CharField(max_length=10, blank=True, null=True)
 
-    # Timestamp otomatis
+    # Players (sudah bagus)
+    white_player = models.CharField(max_length=100)
+    black_player = models.CharField(max_length=100)
+    white_elo = models.IntegerField(blank=True, null=True)
+    black_elo = models.IntegerField(blank=True, null=True)
+
+    # Core content (Kita perbaiki)
+    result = models.CharField(
+        max_length=10, 
+        choices=RESULT_CHOICES, # Kita kembalikan choices
+        blank=True, 
+        null=True             # Tapi tetap opsional, ini bagus
+    )
+    pgn = models.TextField(help_text="Notasi permainan lengkap (PGN)")
+
+    # Optional meta (sudah bagus)
+    eco_code = models.CharField(max_length=10, blank=True, null=True)
+    opening = models.CharField(max_length=150, blank=True, null=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.white_player} vs {self.black_player} ({self.game_date.year})"
+        # --- Kita buat jadi "Aman dari None" ---
+        date_str = self.game_date.strftime('%Y-%m-%d') if self.game_date else '????'
+        return f"{self.white_player} vs {self.black_player} ({date_str})"
 
     class Meta:
-        ordering = ['-game_date'] # Urutkan permainan dari yang paling baru
+        ordering = ['-game_date']
+        
+
+
+class Meta:
+    indexes = [
+        models.Index(fields=['white_player']),
+        models.Index(fields=['black_player']),
+        models.Index(fields=['event']),
+    ]

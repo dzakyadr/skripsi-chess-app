@@ -1,42 +1,89 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Daftar Permainan Catur</title>
-    <style>
-        body { font-family: sans-serif; margin: 2em; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
-    </style>
-</head>
-<body>
-    <h1>Database Permainan Catur</h1>
-    <p><a href="{% url 'upload_pgn' %}">Upload PGN Baru</a></p>
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Daftar Permainan - Chess App{% endblock %}
 
-    <table>
-        <thead>
-            <tr>
-                <th>No.</th>
-                <th>Pemain (Putih vs Hitam)</th>
-                <th>Hasil</th>
-                <th>Event</th>
-                <th>Tanggal</th>
-            </tr>
-        </thead>
-        <tbody>
-    {% for game in games %}
-    <tr>
-        <td><a href="{% url 'game_detail' game.id %}">{{ forloop.counter }}</a></td>
-        <td><a href="{% url 'game_detail' game.id %}">{{ game.white_player }} vs {{ game.black_player }}</a></td>
-        <td>{{ game.get_result_display }}</td>
-        <td>{{ game.event }}</td>
-        <td>{{ game.game_date }}</td>
-    </tr>
-    {% empty %}
+{% block content %}
+<h1>Daftar Permainan</h1>
+<p><a href="{% url 'upload_pgn' %}">Upload PGN Baru</a></p> 
+
+<form method="get" style="margin-bottom:1em;">
+
+<form method="get" style="margin-bottom:1em;">
+  <input type="text" name="q" placeholder="Cari pemain / opening / event..." value="{{ q|default:'' }}" />
+  <select name="sort">
+    <option value="created" {% if sort == 'created' %}selected{% endif %}>Terbaru</option>
+    <option value="date" {% if sort == 'date' %}selected{% endif %}>Tanggal</option>
+    <option value="event" {% if sort == 'event' %}selected{% endif %}>Event (A-Z)</option>
+    <option value="white" {% if sort == 'white' %}selected{% endif %}>White (A-Z)</option>
+    <option value="black" {% if sort == 'black' %}selected{% endif %}>Black (A-Z)</option>
+    <option value="id" {% if sort == 'id' %}selected{% endif %}>ID</option>
+  </select>
+
+  <select name="order">
+    <option value="desc" {% if order == 'desc' %}selected{% endif %}>Desc</option>
+    <option value="asc" {% if order == 'asc' %}selected{% endif %}>Asc</option>
+  </select>
+
+  <select name="per_page">
+    <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+    <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
+    <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+  </select>
+
+  <button type="submit">Terapkan</button>
+  <a href="{% url 'game_list' %}" style="margin-left:1em;">Reset</a>
+</form>
+
+{% if games %}
+  <table style="border-collapse: collapse; width: 100%;">
+    <thead>
+      <tr>
+        <th style="border-bottom:1px solid #ccc; padding:6px; text-align:left;">No</th>
+        <th style="border-bottom:1px solid #ccc; padding:6px; text-align:left;">Event</th>
+        <th style="border-bottom:1px solid #ccc; padding:6px; text-align:left;">White</th>
+        <th style="border-bottom:1px solid #ccc; padding:6px; text-align:left;">Black</th>
+        <th style="border-bottom:1px solid #ccc; padding:6px; text-align:left;">Date</th>
+        <th style="border-bottom:1px solid #ccc; padding:6px; text-align:left;">ID</th>
+        <th style="border-bottom:1px solid #ccc; padding:6px; text-align:left;">Result</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for g in games %}
+      <tr>
+        <!-- nomor urut global = offset + forloop.counter -->
+        <td style="padding:6px; vertical-align:top;">{{ offset|add:forloop.counter }}</td>
+
+        <td style="padding:6px; vertical-align:top;"><a href="{% url 'game_detail' g.id %}">{{ g.event|default:"-" }}</a></td>
+        <td style="padding:6px; vertical-align:top;">{{ g.white_player }}</td>
+        <td style="padding:6px; vertical-align:top;">{{ g.black_player }}</td>
+        <td style="padding:6px; vertical-align:top;">{% if g.game_date %}{{ g.game_date|date:"M. j, Y" }}{% else %}-{% endif %}</td>
+        <td style="padding:6px; vertical-align:top;">{{ g.id }}</td>
+        <td style="padding:6px; vertical-align:top;">{{ g.result|default:"-" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Pagination controls -->
+  <div style="margin-top:1em;">
+    <span>Halaman {{ games.number }} dari {{ games.paginator.num_pages }}</span>
+    {% if games.has_previous %}
+      <a href="?{% if q %}q={{ q }}&{% endif %}sort={{ sort }}&order={{ order }}&per_page={{ per_page }}&page={{ games.previous_page_number }}">Prev</a>
+    {% endif %}
+    {% for p in games.paginator.page_range %}
+      {% if p == games.number %}
+        <strong>{{ p }}</strong>
+      {% else %}
+        <a href="?{% if q %}q={{ q }}&{% endif %}sort={{ sort }}&order={{ order }}&per_page={{ per_page }}&page={{ p }}">{{ p }}</a>
+      {% endif %}
     {% endfor %}
-</tbody>
-    </table>
+    {% if games.has_next %}
+      <a href="?{% if q %}q={{ q }}&{% endif %}sort={{ sort }}&order={{ order }}&per_page={{ per_page }}&page={{ games.next_page_number }}">Next</a>
+    {% endif %}
+  </div>
 
-</body>
-</html>
+{% else %}
+  <p>Belum ada permainan.</p>
+{% endif %}
+
+{% endblock %}
