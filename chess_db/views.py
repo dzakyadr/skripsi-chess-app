@@ -2,17 +2,14 @@
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from .forms import UploadPgnForm
+from .forms import UploadPgnForm, GameEditForm
 from .models import Game
 import chess.pgn
 import io
 from datetime import datetime
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db.models import Q
-
-
-
-
+from django.views.decorators.http import require_POST
 
 def upload_pgn(request):
     if request.method == 'POST':
@@ -185,3 +182,34 @@ def game_detail(request, game_id):
         'fen_list': fen_list, # Kita kirim list FEN-nya
     }
     return render(request, 'chess_db/game_detail.html', context)
+
+def game_edit(request, game_id):
+    # Ambil game yang mau diedit, atau tampilkan 404 jika tidak ada
+    game = get_object_or_404(Game, pk=game_id)
+
+    if request.method == 'POST':
+        # Jika pengguna MENYIMPAN form (request POST)
+        form = GameEditForm(request.POST, instance=game)
+        if form.is_valid():
+            form.save() # Simpan perubahan ke database
+            messages.success(request, "Game berhasil diperbarui!")
+            return redirect('game_detail', game_id=game.id) # Kembali ke halaman detail
+    else:
+        form = GameEditForm(instance=game)
+
+    context = {
+        'form': form,
+        'game': game  
+    }
+    return render(request, 'chess_db/game_edit.html', context)
+
+@require_POST
+def game_delete(request, game_id):
+    game = get_object_or_404(Game, pk=game_id)
+    
+    game_title = f"{game.white_player} vs {game.black_player}"
+    game.delete()
+    
+    messages.success(request, f"Game '{game_title}' telah berhasil dihapus.")
+    
+    return redirect('game_list')

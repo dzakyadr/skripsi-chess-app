@@ -4,7 +4,7 @@
 
 {% block content %}
 <h1>Daftar Permainan</h1>
-<p><a href="{% url 'upload_pgn' %}">Upload PGN Baru</a></p> 
+<p><a href="{% url 'upload_pgn' %}">Upload New PGN</a></p> 
 
 <form method="get" style="margin-bottom:1em;">
 
@@ -45,6 +45,7 @@
         <th style="border-bottom:1px solid #ccc; padding:6px; text-align:left;">Date</th>
         <th style="border-bottom:1px solid #ccc; padding:6px; text-align:left;">ID</th>
         <th style="border-bottom:1px solid #ccc; padding:6px; text-align:left;">Result</th>
+        <th style="border-bottom:1px solid #ccc; padding:6px; text-align:left;">Actions</th>
       </tr>
     </thead>
     <tbody>
@@ -58,7 +59,16 @@
         <td style="padding:6px; vertical-align:top;">{{ g.black_player }}</td>
         <td style="padding:6px; vertical-align:top;">{% if g.game_date %}{{ g.game_date|date:"M. j, Y" }}{% else %}-{% endif %}</td>
         <td style="padding:6px; vertical-align:top;">{{ g.id }}</td>
-        <td style="padding:6px; vertical-align:top;">{{ g.result|default:"-" }}</td>
+        <td style="padding:6px; vertical-align:top;">{{ g.result|default:"-" }}
+          <td style="padding:6px; vertical-align:top;">
+            <a href="{% url 'game_edit' g.id %}">Edit</a>
+            <form method="post" action="{% url 'game_delete' g.id %}" style="display: inline; margin-left: 8px;" onsubmit="return confirm('Apakah Anda yakin ingin menghapus game ini?');">
+        {% csrf_token %}
+        <button type="submit" style="color: #dc3545; background: none; border: none; padding: 0; font-family: inherit; font-size: inherit; cursor: pointer; text-decoration: underline;">
+            Hapus
+        </button>
+        </form>
+        </td>
       </tr>
       {% endfor %}
     </tbody>

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Edit Game{% endblock %}
+
+{% block content %}
+<h1>Edit Game</h1>
+<h2>{{ game.white_player }} vs {{ game.black_player }}</h2>
+
+<form method="post">
+    {% csrf_token %}
+    
+    {{ form.as_p }}
+    
+    <button type="submit">Simpan Perubahan</button>
+    
+    <a href="{% url 'game_detail' game.id %}" style="margin-left: 1em;">Batal</a>
+</form>
+
+<style>
+    form {
+        max-width: 600px;
+    }
+    form p {
+        display: grid;
+        grid-template-columns: 150px 1fr;
+        gap: 10px;
+        align-items: center;
+    }
+    form p label {
+        font-weight: bold;
+        text-align: right;
+    }
+</style>
+
+{% endblock %}

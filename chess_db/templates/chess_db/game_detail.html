@@ -3,10 +3,14 @@
 {% block title %}{{ game.white_player }} vs {{ game.black_player }}{% endblock %}
 
 {% block content %}
-<h1>{{ game.white_player }} vs {{ game.black_player }}</h1>
+<div style="display: flex; justify-content: space-between; align-items: center;">
+    <h1>{{ game.white_player }} vs {{ game.black_player }}</h1>
+    
+    <a href="{% url 'game_edit' game.id %}" style="font-size: 1.2em; text-decoration: none;">✏️ Edit Game</a>
+</div>
+
 <p><strong>Event:</strong> {{ game.event|default:"-" }} • <strong>Date:</strong> {{ game.game_date|default:"-" }}</p>
 <p><strong>Result:</strong> {{ game.result|default:"-" }}</p>
-
 <div style="display:flex; gap:24px; align-items:flex-start;">
   <div>
     <link rel="stylesheet" href="{% static 'assets/chessboard.css' %}"/>

@@ -5,11 +5,14 @@ from . import views
 
 
 urlpatterns = [
-    # URL untuk halaman utama (daftar game), kita taruh di paling atas
     path('', views.game_list, name='game_list'), 
     
-    # URL untuk upload yang sudah kita buat sebelumnya
     path('upload/', views.upload_pgn, name='upload_pgn'),
     
     path('game/<int:game_id>/', views.game_detail, name='game_detail'),
+    
+    path('game/<int:game_id>/edit/', views.game_edit, name='game_edit'),
+    
+    path('game/<int:game_id>/delete/', views.game_delete, name='game_delete'),
+
 ]
