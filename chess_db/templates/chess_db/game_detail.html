@@ -1,110 +1,224 @@
-{% extends "base.html" %}
-{% load static %}
-{% block title %}{{ game.white_player }} vs {{ game.black_player }}{% endblock %}
+{% extends "base.html" %} 
+{% load static %} 
+{% block title %}
+{{ game.white_player }} vs {{ game.black_player }}
+{% endblock %} 
 
-{% block content %}
-<div style="display: flex; justify-content: space-between; align-items: center;">
-    <h1>{{ game.white_player }} vs {{ game.black_player }}</h1>
-    
-    <a href="{% url 'game_edit' game.id %}" style="font-size: 1.2em; text-decoration: none;">✏️ Edit Game</a>
+{% block content%}
+<div style="display: flex; justify-content: space-between; align-items: center">
+<h1>{{ game.white_player }} vs {{ game.black_player }}</h1>
+<a href="{% url 'game_edit' game.id %}"
+style="font-size: 1.2em; text-decoration: none">Edit Game</a>
 </div>
-
-<p><strong>Event:</strong> {{ game.event|default:"-" }} • <strong>Date:</strong> {{ game.game_date|default:"-" }}</p>
+<p>
+  <strong>Event:</strong> {{ game.event|default:"-" }} • <strong>Date:</strong> {{ game.game_date|default:"-" }}
+</p>
 <p><strong>Result:</strong> {{ game.result|default:"-" }}</p>
-<div style="display:flex; gap:24px; align-items:flex-start;">
+<p><strong>White ELO:</strong> {{ game.white_elo|default:"N/A" }}</p>
+<p><strong>Black ELO:</strong> {{ game.black_elo|default:"N/A" }}</p>
+<p><strong>Opening:</strong> {{ game.opening|default:"N/A" }} ({{ game.eco_code|default:"N/A" }})</p>
+{% if game.tags %}
+<p><strong>Tags:</strong> 
+    <span style="font-family: monospace; background-color: #eee; padding: 2px 5px; border-radius: 4px;">
+        {{ game.tags }}
+    </span>
+</p>
+{% endif %}
+
+<div style="display: flex; gap: 24px; align-items: flex-start">
+  
   <div>
-    <link rel="stylesheet" href="{% static 'assets/chessboard.css' %}"/>
-
-    <div id="board" style="width:520px; height:520px; border:1px solid #ddd;"></div>
-    <div style="margin-top:8px;">
-      <button id="prevBtn">Prev</button>
-      <button id="nextBtn">Next</button>
-      <button id="playBtn">Play</button>
-      <label style="margin-left:8px;"><input type="checkbox" id="draggableToggle"> Enable moves</label>
+    <link rel="stylesheet" href="{% static 'assets/chessboard.css' %}" />
+    <div
+      id="board"
+      style="width: 520px; height: 520px; border: 1px solid #ddd"
+    ></div>
+    <div style="margin-top: 8px">
+<button id="prevBtn">Prev</button>
+      <button id="nextBtn">Next</button>
+      <button id="playBtn">Play</button>
+      <label style="margin-left: 8px"><input type="checkbox" id="draggableToggle" /> Enable moves</label>
+    </div>
+    <div style="margin-top: 8px">
+      Move: <span id="moveIndex">0</span> / <span id="moveCount">0</span>
+      <input
+        id="moveRange"
+        type="range"
+        min="0"
+        max="0"
+        value="0"
+        style="width: 300px; margin-left: 8px"
+      />
+    </div>
+    <div style="margin-top: 1.5em; background:#fffbe6; border:1px solid #ffe58f; padding:15px; border-radius:4px;">
+        <h3 style="margin-top: 0; margin-bottom: 10px; font-size: 1.1em;">Catatan Pribadi</h3>
+        
+        <form method="post">
+            {% csrf_token %}
+            
+            {{ notes_form.notes }}
+            
+            <div style="text-align: right; margin-top: 8px;">
+                <button type="submit" style="background-color: #4CAF50; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">
+                    Simpan Catatan
+                </button>
+            </div>
+        </form>
     </div>
-    <div style="margin-top:8px;">
-      Move: <span id="moveIndex">0</span> / <span id="moveCount">0</span>
-      <input id="moveRange" type="range" min="0" max="0" value="0" style="width:300px; margin-left:8px;">
     </div>
-  </div>
-  <div style="flex:1;">
-    <h3>PGN</h3>
-    <pre style="background:#f7f7f7; padding:8px; border-radius:4px; max-height:480px; overflow:auto;">{{ game.pgn|default:"(no pgn)" }}</pre>
-  </div>
-</div>
+  </div>   <div style="flex: 1; min-width: 0;">     <h3>Move List</h3>
+    <div id="move-list-container" style="
+        background: #f7f7f7;
+        padding: 8px;
+        border-radius: 4px;
+        max-height: 240px;
+        max-width: 50%;
+        overflow-y: auto; 
+        font-family: monospace;
+        font-size: 1.1em;
+        white-space: pre-wrap; 
+        overflow-wrap: break-word;
+    ">
+        </div>
 
-{{ fen_list|json_script:"fen-list-data" }} <script type="module">
-    // 2. Import HANYA Chessboard LANGSUNG dari static/src/ (Path Benar)
-    import {Chessboard} from "{% static 'src/Chessboard.js' %}";
-    // Kita TIDAK mengimpor Pgn atau Chess.js lagi
+    <h3 style="margin-top: 1.5em;">Raw PGN</h3>
+    <pre
+      style="
+        background: #f7f7f7;
+        padding: 8px;
+        border-radius: 4px;
+        max-height: 240px;
+        max-width: 50%;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-all;
+      "
+    >
+{{ game.pgn|default:"(no pgn)" }}</pre
+    >
+  </div> </div>
 
-    // Ambil FEN list dari Django
-    const fenListRaw = JSON.parse(document.getElementById('fen-list-data').textContent) || [];
-    const validFenList = (Array.isArray(fenListRaw) && fenListRaw.length) ? fenListRaw : ["start"];
-    const container = document.getElementById('board');
+    
 
-    // 3. Sprite SVG tetap di static/assets/pieces/ (Path Benar)
-    const spriteUrl = "{% static 'assets/pieces/standard.svg' %}"; // Pastikan file ini ada
+{{ move_data_list|json_script:"move-data" }}
 
-    // 4. Buat papan catur dengan file sprite
-    const board = new Chessboard(container, {
-        position: validFenList[0], // Tampilkan posisi awal dari FEN list
-        assetsUrl: "{% static '/' %}", // Beritahu base URL untuk aset internal
-        style: {
-            pieces: {
-                // Beritahu path file sprite relatif dari assetsUrl
-                file: "assets/pieces/standard.svg"
-            }
-        },
-        draggable: false
-    });
+<script type="module">
+  import { Chessboard } from "{% static 'src/Chessboard.js' %}";
 
-    // --- Logika UI & Navigasi (Tetap Sama, menggunakan FEN list) ---
-    const prevBtn = document.getElementById('prevBtn');
-    const nextBtn = document.getElementById('nextBtn');
-    const playBtn = document.getElementById('playBtn');
-    const moveIndexEl = document.getElementById('moveIndex');
-    const moveCountEl = document.getElementById('moveCount');
-    const moveRange = document.getElementById('moveRange');
-    const draggableToggle = document.getElementById('draggableToggle');
+  // --- KUMPULKAN SEMUA DATA DARI DJANGO ---
+  const moveDataList = JSON.parse(document.getElementById("move-data").textContent) || [];
+  const validMoveData = (Array.isArray(moveDataList) && moveDataList.length) ? moveDataList : [{fen: "start", notation: "No Data", move_number: ""}];
+  const container = document.getElementById("board");
+  const spriteUrl = "{% static 'assets/pieces/standard.svg' %}"; 
 
-    let idx = 0;
-    const maxMoves = Math.max(0, validFenList.length - 1);
-    moveCountEl.textContent = maxMoves;
-    moveIndexEl.textContent = idx;
-    moveRange.min = 0;
-    moveRange.max = maxMoves;
-    moveRange.value = 0;
+  const board = new Chessboard(container, {
+    position: validMoveData[0].fen, // Ambil FEN pertama
+    assetsUrl: "{% static '/' %}", 
+    style: { pieces: { file: "assets/pieces/standard.svg" } },
+    draggable: true,});
 
-    function setIndex(i){
-        idx = Math.max(0, Math.min(i, maxMoves));
-        if (validFenList[idx]) {
-            // Gunakan setPosition untuk menampilkan FEN dari list
-            board.setPosition(validFenList[idx], true); // true untuk animasi
+  // --- KUMPULKAN SEMUA ELEMEN UI ---
+const prevBtn = document.getElementById("prevBtn");
+const nextBtn = document.getElementById("nextBtn");
+const playBtn = document.getElementById("playBtn");
+const moveIndexEl = document.getElementById("moveIndex");
+const moveCountEl = document.getElementById("moveCount");
+const moveRange = document.getElementById("moveRange");
+const draggableToggle = document.getElementById("draggableToggle");
+const moveListContainer = document.getElementById("move-list-container");
+
+  let idx = 0;
+  // -1 karena index 0 adalah "Posisi Awal"
+  const maxMoves = Math.max(0, validMoveData.length - 1); 
+  moveCountEl.textContent = maxMoves;
+  moveIndexEl.textContent = idx;
+  moveRange.min = 0;
+  moveRange.max = maxMoves;
+  moveRange.value = 0;
+
+  // --- FUNGSI BARU UNTUK MEMBUAT DAFTAR LANGKAH ---
+  function renderMoveList() {
+    moveListContainer.innerHTML = ""; // Kosongkan daftar
+    validMoveData.forEach((move, index) => {
+        // Buat elemen <span> untuk setiap langkah
+        const moveEl = document.createElement("span");
+        
+        // Tampilkan nomor langkah (jika Putih)
+        if (move.move_number.endsWith(".")) {
+            const numberEl = document.createElement("strong");
+            numberEl.textContent = move.move_number;
+            moveListContainer.appendChild(numberEl);
         }
-        moveIndexEl.textContent = idx;
-        moveRange.value = idx;
+        
+        moveEl.textContent = move.notation;
+        moveEl.id = "move-" + index; // Beri ID unik
+        moveEl.dataset.index = index; // Simpan index-nya
+        moveEl.style.cursor = "pointer";
+        moveEl.style.padding = "2px 4px";
+        moveEl.style.borderRadius = "3px";
+
+        // Tambahkan event listener agar bisa diklik
+        moveEl.addEventListener("click", () => {
+            setIndex(index);
+        });
+
+        moveListContainer.appendChild(moveEl);
+        moveListContainer.appendChild(document.createTextNode(" ")); // Kasih spasi
+    });
+  }
+
+  // --- FUNGSI UTAMA KITA (SETINDEX) ---
+  function setIndex(i) {
+    idx = Math.max(0, Math.min(i, maxMoves));
+    
+    // Ambil FEN dari data baru kita
+    if (validMoveData[idx]) {
+      board.setPosition(validMoveData[idx].fen, true); 
     }
+    moveIndexEl.textContent = idx;
+    moveRange.value = idx;
+    highlightActiveMove();}
 
-    prevBtn.addEventListener('click', () => setIndex(idx - 1));
-    nextBtn.addEventListener('click', () => setIndex(idx + 1));
-    moveRange.addEventListener('input', (e) => setIndex(parseInt(e.target.value, 10)));
+  // --- FUNGSI BARU UNTUK HIGHLIGHT LANGKAH ---
+  function highlightActiveMove() {
+      // 1. Hapus highlight dari semua langkah
+      const allMoves = moveListContainer.querySelectorAll("span");
+      allMoves.forEach(el => el.style.backgroundColor = "transparent");
+      
+      // 2. Beri highlight ke langkah yang aktif
+      const activeMove = document.getElementById("move-" + idx);
+      if (activeMove) {
+          activeMove.style.backgroundColor = "#fff3a3"; // Warna kuning
+          // Auto-scroll ke langkah yang aktif
+          activeMove.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+  }
 
-    let playInterval = null;
-    playBtn.addEventListener('click', () => {
-        if (playInterval) { clearInterval(playInterval); playInterval = null; playBtn.textContent = 'Play'; return; }
-        playBtn.textContent = 'Pause';
-        playInterval = setInterval(() => {
-            if (idx < maxMoves) setIndex(idx + 1);
-            else { clearInterval(playInterval); playInterval = null; playBtn.textContent = 'Play'; }
-        }, 800);
-    });
+  // --- Event Listeners (TETAP SAMA) ---
+prevBtn.addEventListener("click", () => setIndex(idx - 1));
+nextBtn.addEventListener("click", () => setIndex(idx + 1));
+moveRange.addEventListener("input", (e) =>
+setIndex(parseInt(e.target.value, 10)));
+let playInterval = null;
+playBtn.addEventListener("click", () => {
+    if (playInterval) {
+      clearInterval(playInterval); playInterval = null; playBtn.textContent = "Play"; return;
+    }
+    playBtn.textContent = "Pause";
+    playInterval = setInterval(() => {
+      if (idx < maxMoves) setIndex(idx + 1);
+      else {
+        clearInterval(playInterval); playInterval = null; playBtn.textContent = "Play";
+      }
+    }, 800);
+  });
+  draggableToggle.addEventListener("change", (ev) => {
+    board.setOptions({ draggable: ev.target.checked });
+  });
 
-    draggableToggle.addEventListener('change', (ev) => {
-        board.setOptions({ draggable: ev.target.checked });
-    });
-
-    setIndex(0); // Tampilkan posisi awal
+  // --- JALANKAN SAAT PERTAMA KALI DIMUAT ---
+  renderMoveList(); // Buat daftar langkahnya
+  setIndex(0); // Tampilkan posisi awal
 </script>
 
 {% endblock %}

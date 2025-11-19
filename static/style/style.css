@@ -1,0 +1,178 @@
+/* 1. Daftar untuk yang REGULAR (Normal) */
+@font-face {
+    font-family: 'Barich';
+    /* Perhatikan tanda titik dua kali (..) artinya mundur satu folder */
+    src: url('../fonts/BarichDEMO-Regular-BF6690d3e7b696d.ttf') format('truetype');
+    font-weight: normal; /* atau 400 */
+    font-style: normal;
+}
+
+/* 2. Daftar untuk yang BOLD (Tebal) */
+@font-face {
+    font-family: 'Barich';
+    src: url('../fonts/BarichDEMO-Bold-BF6690d3e7af8a0.ttf') format('truetype');
+    font-weight: bold; /* atau 700 */
+    font-style: normal;
+}
+
+/* 3. Daftar untuk yang MEDIUM (Agak Tebal) */
+@font-face {
+    font-family: 'Barich';
+    src: url('../fonts/BarichDEMO-Medium-BF6690d3e7afeaf.ttf') format('truetype');
+    font-weight: 500; /* 500 biasanya untuk Medium */
+    font-style: normal;
+}
+
+/* 4. Daftar untuk yang SEMIBOLD */
+@font-face {
+    font-family: 'Barich';
+    src: url('../fonts/BarichDEMO-SemiBold-BF6690d3e7a8c76.ttf') format('truetype');
+    font-weight: 600; /* 600 biasanya untuk SemiBold */
+    font-style: normal;
+}
+:root {
+    --bg-body: #1e293b;
+    --bg-card: #20293a;
+    --text-main: #f1f5f9;
+    --text-muted: #94a3b8;
+    
+    --color-primary: #f1f5f9; 
+    --color-primary-hover: #00c2bb;
+    
+    --color-danger: #ff0055; /* Magenta Neon */
+    --color-danger-hover: #cc0044;
+    
+    --border-color: #2d3748; /* Garis tipis */
+}
+
+/* --- BASE STYLES --- */
+body {
+    background-color: var(--bg-body);
+    color: var(--text-main);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Font modern */
+}
+
+/* --- OVERRIDE BOOTSTRAP CARD --- */
+.card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+}
+.card-header {
+    background-color: rgba(255, 255, 255, 0.05); /* Transparan sedikit */
+    border-bottom: 1px solid var(--border-color);
+    color: var(--color-primary);
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* --- OVERRIDE BOOTSTRAP TABLE --- */
+.table {
+    color: var(--text-main);
+    border-color: var(--border-color);
+}
+.table-striped > tbody > tr:nth-of-type(odd) > * {
+    color: var(--text-main);
+    background-color: rgba(255, 255, 255, 0.02); /* Zebra striping halus */
+}
+.table-hover > tbody > tr:hover > * {
+    color: var(--color-primary); /* Teks jadi neon saat di-hover */
+    background-color: rgba(0, 242, 234, 0.05); /* Glow cyan tipis */
+}
+
+/* --- OVERRIDE NAVBAR --- */
+.navbar-dark.bg-dark {
+    background-color: var(--bg-card) !important;
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: 0 4px 20px rgba(0, 242, 234, 0.1); /* Efek glow neon di bawah navbar */
+}
+.navbar-brand {
+    color: var(--color-primary) !important;
+    font-family: 'Barich', sans-serif;
+    font-weight: bold;
+    font-size: 2rem;
+    letter-spacing: 1.5px;
+    text-shadow: 0 0 10px rgba(0, 242, 234, 0.5); 
+    text-decoration: none;
+    color: var(--color-primary);
+}
+
+.navbar-brand:hover {
+    text-decoration: none !important; /* Paksa hapus garis bawah saat hover */
+    color: var(--color-primary);
+}
+
+.navbar-nav .nav-link {
+    color: var(--color-primary) !important;
+    text-decoration: none !important;
+    transition: color 0.3s ease;
+}
+.navbar-nav .nav-link:hover {
+    color: var(--color-primary-hover) !important;
+    text-decoration: none !important;
+}
+
+/* --- OVERRIDE BUTTONS (Bikin jadi Neon) --- */
+.btn-primary {
+    background-color: transparent;
+    border: 1px solid var(--color-primary);
+    color: var(--color-primary);
+    transition: all 0.3s ease;
+}
+.btn-primary:hover {
+    background-color: var(--color-primary);
+    color: #000; /* Teks jadi hitam biar kontras */
+    box-shadow: 0 0 15px var(--color-primary); /* Efek glow */
+}
+
+.btn-danger {
+    background-color: transparent;
+    border: 1px solid var(--color-danger);
+    color: var(--color-danger);
+}
+.btn-danger:hover {
+    background-color: var(--color-danger);
+    color: #fff;
+    box-shadow: 0 0 15px var(--color-danger);
+}
+
+/* --- FORM INPUTS (Biar gelap) --- */
+.form-control, .form-select {
+    background-color: #0f131a;
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+}
+.form-control:focus, .form-select:focus {
+    background-color: #0f131a;
+    color: var(--text-main);
+    border-color: var(--color-primary);
+    box-shadow: 0 0 10px rgba(0, 242, 234, 0.3);
+}
+
+/* --- LINK BIASA --- */
+a {
+    color: var(--color-primary);
+    text-decoration: none;
+}
+a:hover {
+    color: var(--color-primary-hover);
+    text-decoration: underline;
+}
+
+.form-control::placeholder {
+    color: #adb5bd !important; /* Abu-abu terang */
+    opacity: 1; /* Pastikan tidak transparan */
+}
+
+/* Khusus untuk input yang sedang aktif/fokus */
+.form-control:focus::placeholder {
+    color: #6c757d !important; /* Sedikit lebih gelap saat diketik */
+}
+
+footer {
+    background-color: var(--bg-card) !important; 
+    border-top: 1px solid var(--border-color) !important;
+    color: var(--text-muted) !important;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3); 
+}

@@ -1,26 +1,96 @@
 {% load static %}
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}Chess App{% endblock %}</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}Chesstify{% endblock %}</title>
 
-  <!-- contoh pemanggilan static yang aman -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{% static 'style/style.css' %}" />
 
-</head>
-<body>
-  <header>
-    <h2><a href="{% url 'game_list' %}">Chesstify</a></h2>
-    <hr>
-  </header>
+    <style>
+      html,
+      body {
+        height: 100%; /* Pastikan html dan body minimal setinggi layar */
+        margin: 0;
+      }
 
-  <main>
-    {% block content %}{% endblock %}
-  </main>
+      body {
+        display: flex;
+        flex-direction: column; /* Susun elemen (Navbar, Main, Footer) secara vertikal */
+        min-height: 100vh; /* Minimal setinggi layar viewport */
+      }
 
-  <footer>
-    <small>© 2025 Chesstify by Muhammad Dzaky Adrian</small>
-  </footer>
-</body>
+      main {
+        flex: 1;
+      }
+
+      footer {
+        flex-shrink: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+      <div class="container">
+        <a class="navbar-brand" href="{% url 'game_list' %}">♟️ Chesstify</a>
+
+        <button
+          class="navbar-toggler"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#navbarNav"
+          aria-controls="navbarNav"
+          aria-expanded="false"
+          aria-label="Toggle navigation"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav ms-auto align-items-center">
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'game_list' %}">Dashboard</a>
+            </li>
+
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'opening_explorer' %}"
+                >Opening Explorer</a
+              >
+            </li>
+
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'upload_pgn' %}">Upload PGN</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+    <main class="container">
+      {% if messages %} {% for message in messages %}
+      <div
+        class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show"
+      >
+        {{ message }}
+        <button
+          type="button"
+          class="btn-close"
+          data-bs-dismiss="alert"
+        ></button>
+      </div>
+      {% endfor %} {% endif %} {% block content %}{% endblock %}
+    </main>
+
+    <footer class="text-center py-3 mt-auto">
+    <div class="container small">
+      &copy; 2025 Chesstify @ Muhammad Dzaky Adrian
+    </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
 </html>

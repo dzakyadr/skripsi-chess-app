@@ -23,18 +23,20 @@ class Game(models.Model):
     white_elo = models.IntegerField(blank=True, null=True)
     black_elo = models.IntegerField(blank=True, null=True)
 
-    # Core content (Kita perbaiki)
     result = models.CharField(
         max_length=10, 
-        choices=RESULT_CHOICES, # Kita kembalikan choices
+        choices=RESULT_CHOICES, 
         blank=True, 
-        null=True             # Tapi tetap opsional, ini bagus
+        null=True
     )
     pgn = models.TextField(help_text="Notasi permainan lengkap (PGN)")
 
     # Optional meta (sudah bagus)
     eco_code = models.CharField(max_length=10, blank=True, null=True)
     opening = models.CharField(max_length=150, blank=True, null=True)
+    
+    tags = models.CharField(max_length=255, blank=True, null=True)
+    notes = models.TextField(blank=True, null=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

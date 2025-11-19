@@ -1,0 +1,96 @@
+{% extends "base.html" %} {% load static %} {% block title %}Opening Explorer -
+Chesstify{% endblock %} {% block content %}
+<h1>Opening Explorer</h1>
+<p>Statistik pembukaan berdasarkan semua game di database Anda.</p>
+
+<div style="display: flex; gap: 24px; align-items: flex-start">
+  <div>
+    <link rel="stylesheet" href="{% static 'assets/chessboard.css' %}" />
+    <div
+      id="board"
+      style="width: 400px; height: 400px; border: 1px solid #ddd"
+    ></div>
+  </div>
+
+  <div style="flex: 1">
+    <h3>Statistik dari Posisi Awal</h3>
+    <table style="width: 100%; border-collapse: collapse">
+      <thead>
+        <tr style="background-color: #f2f2f2">
+          <th style="padding: 8px; border: 1px solid #ddd; text-align: left">
+            Move
+          </th>
+          <th style="padding: 8px; border: 1px solid #ddd; text-align: left">
+            Games
+          </th>
+          <th style="padding: 8px; border: 1px solid #ddd; text-align: left">
+            White Wins
+          </th>
+          <th style="padding: 8px; border: 1px solid #ddd; text-align: left">
+            Draws
+          </th>
+          <th style="padding: 8px; border: 1px solid #ddd; text-align: left">
+            Black Wins
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for data in stats_list|dictsortreversed:"total" %}
+        <tr>
+          <td style="padding: 8px; border: 1px solid #ddd">
+            <strong>{{ data.move }}</strong>
+          </td>
+          <td style="padding: 8px; border: 1px solid #ddd">{{ data.total }}</td>
+
+          <td style="padding: 8px; border: 1px solid #ddd">
+            {{ data.wins }}
+            <span style="font-size: 0.9em; color: #555">
+              ({% widthratio data.wins data.total 100 %}%)
+            </span>
+          </td>
+
+          <td style="padding: 8px; border: 1px solid #ddd">
+            {{ data.draws }}
+            <span style="font-size: 0.9em; color: #555">
+              ({% widthratio data.draws data.total 100 %}%)
+            </span>
+          </td>
+
+          <td style="padding: 8px; border: 1px solid #ddd">
+            {{ data.losses }}
+            <span style="font-size: 0.9em; color: #555">
+              ({% widthratio data.losses data.total 100 %}%)
+            </span>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5" style="padding: 8px; border: 1px solid #ddd">
+            Database masih kosong. Upload PGN untuk melihat statistik.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script type="module">
+  import { Chessboard } from "{% static 'src/Chessboard.js' %}";
+
+  const container = document.getElementById("board");
+
+  const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+  const board = new Chessboard(container, {
+    position: START_FEN,
+    assetsUrl: "{% static '/' %}",
+    style: {
+      pieces: {
+        file: "assets/pieces/standard.svg",
+      },
+    },
+  });
+</script>
+
+{% endblock %}
