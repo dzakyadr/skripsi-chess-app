@@ -1,224 +1,254 @@
-{% extends "base.html" %} 
-{% load static %} 
-{% block title %}
-{{ game.white_player }} vs {{ game.black_player }}
-{% endblock %} 
+{% extends "base.html" %}
+{% load static %}
 
-{% block content%}
-<div style="display: flex; justify-content: space-between; align-items: center">
-<h1>{{ game.white_player }} vs {{ game.black_player }}</h1>
-<a href="{% url 'game_edit' game.id %}"
-style="font-size: 1.2em; text-decoration: none">Edit Game</a>
+{% block title %}{{ game.white_player }} vs {{ game.black_player }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="fw-bold m-0 text-white">
+    <span class="text-primary">{{ game.white_player }}</span> vs <span class="text-danger">{{ game.black_player }}</span>
+  </h2>
+  <a href="{% url 'game_edit' game.id %}" class="btn btn-outline-light btn-sm">✏️ Edit Info Game</a>
 </div>
-<p>
-  <strong>Event:</strong> {{ game.event|default:"-" }} • <strong>Date:</strong> {{ game.game_date|default:"-" }}
-</p>
-<p><strong>Result:</strong> {{ game.result|default:"-" }}</p>
-<p><strong>White ELO:</strong> {{ game.white_elo|default:"N/A" }}</p>
-<p><strong>Black ELO:</strong> {{ game.black_elo|default:"N/A" }}</p>
-<p><strong>Opening:</strong> {{ game.opening|default:"N/A" }} ({{ game.eco_code|default:"N/A" }})</p>
-{% if game.tags %}
-<p><strong>Tags:</strong> 
-    <span style="font-family: monospace; background-color: #eee; padding: 2px 5px; border-radius: 4px;">
-        {{ game.tags }}
-    </span>
-</p>
-{% endif %}
 
-<div style="display: flex; gap: 24px; align-items: flex-start">
-  
-  <div>
-    <link rel="stylesheet" href="{% static 'assets/chessboard.css' %}" />
-    <div
-      id="board"
-      style="width: 520px; height: 520px; border: 1px solid #ddd"
-    ></div>
-    <div style="margin-top: 8px">
-<button id="prevBtn">Prev</button>
-      <button id="nextBtn">Next</button>
-      <button id="playBtn">Play</button>
-      <label style="margin-left: 8px"><input type="checkbox" id="draggableToggle" /> Enable moves</label>
-    </div>
-    <div style="margin-top: 8px">
-      Move: <span id="moveIndex">0</span> / <span id="moveCount">0</span>
-      <input
-        id="moveRange"
-        type="range"
-        min="0"
-        max="0"
-        value="0"
-        style="width: 300px; margin-left: 8px"
-      />
-    </div>
-    <div style="margin-top: 1.5em; background:#fffbe6; border:1px solid #ffe58f; padding:15px; border-radius:4px;">
-        <h3 style="margin-top: 0; margin-bottom: 10px; font-size: 1.1em;">Catatan Pribadi</h3>
-        
-        <form method="post">
-            {% csrf_token %}
-            
-            {{ notes_form.notes }}
-            
-            <div style="text-align: right; margin-top: 8px;">
-                <button type="submit" style="background-color: #4CAF50; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">
-                    Simpan Catatan
-                </button>
-            </div>
-        </form>
+<div class="card mb-4 shadow-sm border-secondary" style="background-color: var(--bg-card);">
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <p class="mb-1 text-info small fw-bold text-uppercase">Event & Date</p>
+        <div class="text-white fw-bold">{{ game.event|default:"-" }}</div>
+        <div class="text-white-50">📅 {{ game.game_date|default:"-" }}</div>
+      </div>
+      <div class="col-md-4">
+        <p class="mb-1 text-info small fw-bold text-uppercase">Result & Opening</p>
+        <div class="text-white fw-bold">{{ game.result|default:"-" }}</div>
+        <div class="text-white-50">{{ game.opening|default:"-" }} <span class="badge bg-secondary">{{ game.eco_code|default:"" }}</span></div>
+      </div>
+      <div class="col-md-4">
+        <p class="mb-1 text-info small fw-bold text-uppercase">Ratings & Tags</p>
+        <div class="text-white">⚪ {{ game.white_elo|default:"?" }} / ⚫ {{ game.black_elo|default:"?" }}</div>
+        <div class="mt-1">{% if game.tags %}<span class="badge bg-primary text-dark">{{ game.tags }}</span>{% else %}<span class="text-white-50 small">- No Tags -</span>{% endif %}</div>
+      </div>
     </div>
-    </div>
-  </div>   <div style="flex: 1; min-width: 0;">     <h3>Move List</h3>
-    <div id="move-list-container" style="
-        background: #f7f7f7;
-        padding: 8px;
-        border-radius: 4px;
-        max-height: 240px;
-        max-width: 50%;
-        overflow-y: auto; 
-        font-family: monospace;
-        font-size: 1.1em;
-        white-space: pre-wrap; 
-        overflow-wrap: break-word;
-    ">
-        </div>
+  </div>
+</div>
 
-    <h3 style="margin-top: 1.5em;">Raw PGN</h3>
-    <pre
-      style="
-        background: #f7f7f7;
-        padding: 8px;
-        border-radius: 4px;
-        max-height: 240px;
-        max-width: 50%;
-        overflow: auto;
-        white-space: pre-wrap;
-        word-break: break-all;
-      "
-    >
-{{ game.pgn|default:"(no pgn)" }}</pre
-    >
-  </div> </div>
-
+<div class="row g-4">
+  <div class="col-lg-7 col-xl-6">
     
+    <link rel="stylesheet" href="{% static 'assets/chessboard.css' %}" />
+    <link rel="stylesheet" href="{% static 'assets/extensions/markers/markers.css' %}" />
+
+    <div class="card shadow-sm border-0 bg-dark">
+      <div class="card-body p-2 d-flex justify-content-center rounded">
+         <div id="board" style="width: 100%; max-width: 600px; aspect-ratio: 1/1;"></div>
+      </div>
+    </div>
+
+    <div class="mt-3 d-flex align-items-center justify-content-between bg-secondary bg-opacity-10 p-3 rounded border border-secondary">
+      <div class="btn-group">
+        <button id="prevBtn" class="btn btn-outline-light">◀ Prev</button>
+        <button id="playBtn" class="btn btn-outline-primary">Play</button>
+        <button id="nextBtn" class="btn btn-outline-light">Next ▶</button>
+      </div>
+      <div class="form-check form-switch ms-3">
+        <input class="form-check-input" type="checkbox" id="draggableToggle">
+        <label class="form-check-label small text-white" for="draggableToggle">Move Pieces</label>
+      </div>
+    </div>
+    <div class="mt-2 px-2">
+      <input id="moveRange" type="range" class="form-range" min="0" max="0" value="0">
+      <div class="text-center small text-white-50">
+        Move: <span id="moveIndex" class="fw-bold text-white">0</span> / <span id="moveCount">0</span>
+      </div>
+    </div>
+
+    {% if game.notes %}
+    <div class="card mt-4 border-warning bg-transparent">
+      <div class="card-header bg-warning bg-opacity-10 text-warning fw-bold border-warning">📝 Catatan Pribadi</div>
+      <div class="card-body">
+        <form method="post">{% csrf_token %}
+            <div class="mb-2"><textarea name="notes" class="form-control bg-dark text-white border-secondary" rows="4">{{ game.notes|default:"" }}</textarea></div>
+            <div class="text-end"><button type="submit" class="btn btn-warning btn-sm fw-bold text-dark">💾 Simpan</button></div>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-5 col-xl-6">
+    <div class="card shadow-sm bg-dark border-secondary mb-3">
+        <div class="card-header bg-secondary bg-opacity-25 text-white border-secondary py-2"><small class="fw-bold">📋 MOVE LIST</small></div>
+        <div class="card-body p-0" style="height: 400px; overflow-y: auto;">
+            <table class="table table-dark table-striped table-hover table-sm mb-0 text-center" style="font-family: 'JetBrains Mono', monospace;">
+                <thead class="sticky-top bg-secondary"><tr><th class="text-white-50" style="width: 15%;">#</th><th style="width: 42.5%;">White</th><th style="width: 42.5%;">Black</th></tr></thead>
+                <tbody id="moveTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card border-secondary bg-transparent">
+        <div class="card-header border-secondary bg-secondary bg-opacity-10 py-1"><small class="text-info fw-bold" style="font-size: 0.7rem;">RAW PGN</small></div>
+        <pre class="form-control bg-dark text-white-50 border-0 rounded-0 mb-0" style="height: 150px; overflow: auto; white-space: pre-wrap; font-size: 0.85em;">{{ game.pgn|default:"(no pgn)" }}</pre>
+    </div>
+  </div>
+</div>
 
 {{ move_data_list|json_script:"move-data" }}
 
-<script type="module">
-  import { Chessboard } from "{% static 'src/Chessboard.js' %}";
-
-  // --- KUMPULKAN SEMUA DATA DARI DJANGO ---
-  const moveDataList = JSON.parse(document.getElementById("move-data").textContent) || [];
-  const validMoveData = (Array.isArray(moveDataList) && moveDataList.length) ? moveDataList : [{fen: "start", notation: "No Data", move_number: ""}];
-  const container = document.getElementById("board");
-  const spriteUrl = "{% static 'assets/pieces/standard.svg' %}"; 
-
-  const board = new Chessboard(container, {
-    position: validMoveData[0].fen, // Ambil FEN pertama
-    assetsUrl: "{% static '/' %}", 
-    style: { pieces: { file: "assets/pieces/standard.svg" } },
-    draggable: true,});
-
-  // --- KUMPULKAN SEMUA ELEMEN UI ---
-const prevBtn = document.getElementById("prevBtn");
-const nextBtn = document.getElementById("nextBtn");
-const playBtn = document.getElementById("playBtn");
-const moveIndexEl = document.getElementById("moveIndex");
-const moveCountEl = document.getElementById("moveCount");
-const moveRange = document.getElementById("moveRange");
-const draggableToggle = document.getElementById("draggableToggle");
-const moveListContainer = document.getElementById("move-list-container");
-
-  let idx = 0;
-  // -1 karena index 0 adalah "Posisi Awal"
-  const maxMoves = Math.max(0, validMoveData.length - 1); 
-  moveCountEl.textContent = maxMoves;
-  moveIndexEl.textContent = idx;
-  moveRange.min = 0;
-  moveRange.max = maxMoves;
-  moveRange.value = 0;
-
-  // --- FUNGSI BARU UNTUK MEMBUAT DAFTAR LANGKAH ---
-  function renderMoveList() {
-    moveListContainer.innerHTML = ""; // Kosongkan daftar
-    validMoveData.forEach((move, index) => {
-        // Buat elemen <span> untuk setiap langkah
-        const moveEl = document.createElement("span");
-        
-        // Tampilkan nomor langkah (jika Putih)
-        if (move.move_number.endsWith(".")) {
-            const numberEl = document.createElement("strong");
-            numberEl.textContent = move.move_number;
-            moveListContainer.appendChild(numberEl);
-        }
-        
-        moveEl.textContent = move.notation;
-        moveEl.id = "move-" + index; // Beri ID unik
-        moveEl.dataset.index = index; // Simpan index-nya
-        moveEl.style.cursor = "pointer";
-        moveEl.style.padding = "2px 4px";
-        moveEl.style.borderRadius = "3px";
-
-        // Tambahkan event listener agar bisa diklik
-        moveEl.addEventListener("click", () => {
-            setIndex(index);
-        });
-
-        moveListContainer.appendChild(moveEl);
-        moveListContainer.appendChild(document.createTextNode(" ")); // Kasih spasi
-    });
-  }
-
-  // --- FUNGSI UTAMA KITA (SETINDEX) ---
-  function setIndex(i) {
-    idx = Math.max(0, Math.min(i, maxMoves));
-    
-    // Ambil FEN dari data baru kita
-    if (validMoveData[idx]) {
-      board.setPosition(validMoveData[idx].fen, true); 
+<script type="importmap">
+{
+    "imports": {
+        "cm-chessboard": "{% static 'src/Chessboard.js' %}"
     }
-    moveIndexEl.textContent = idx;
-    moveRange.value = idx;
-    highlightActiveMove();}
-
-  // --- FUNGSI BARU UNTUK HIGHLIGHT LANGKAH ---
-  function highlightActiveMove() {
-      // 1. Hapus highlight dari semua langkah
-      const allMoves = moveListContainer.querySelectorAll("span");
-      allMoves.forEach(el => el.style.backgroundColor = "transparent");
-      
-      // 2. Beri highlight ke langkah yang aktif
-      const activeMove = document.getElementById("move-" + idx);
-      if (activeMove) {
-          activeMove.style.backgroundColor = "#fff3a3"; // Warna kuning
-          // Auto-scroll ke langkah yang aktif
-          activeMove.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
-  }
-
-  // --- Event Listeners (TETAP SAMA) ---
-prevBtn.addEventListener("click", () => setIndex(idx - 1));
-nextBtn.addEventListener("click", () => setIndex(idx + 1));
-moveRange.addEventListener("input", (e) =>
-setIndex(parseInt(e.target.value, 10)));
-let playInterval = null;
-playBtn.addEventListener("click", () => {
-    if (playInterval) {
-      clearInterval(playInterval); playInterval = null; playBtn.textContent = "Play"; return;
-    }
-    playBtn.textContent = "Pause";
-    playInterval = setInterval(() => {
-      if (idx < maxMoves) setIndex(idx + 1);
-      else {
-        clearInterval(playInterval); playInterval = null; playBtn.textContent = "Play";
-      }
-    }, 800);
-  });
-  draggableToggle.addEventListener("change", (ev) => {
-    board.setOptions({ draggable: ev.target.checked });
-  });
-
-  // --- JALANKAN SAAT PERTAMA KALI DIMUAT ---
-  renderMoveList(); // Buat daftar langkahnya
-  setIndex(0); // Tampilkan posisi awal
+}
 </script>
 
+<script type="module">
+    import { Chessboard } from "cm-chessboard";
+    // 3. IMPORT MARKERS DARI SRC (LOKASI YANG BENAR)
+    import { Markers, MARKER_TYPE } from "{% static 'src/extensions/markers/Markers.js' %}";
+
+    const MARKER_SQUARE = { class: "marker-square", slice: "markerSquare" };
+
+    const moveDataList = JSON.parse(document.getElementById("move-data").textContent) || [];
+    const validMoveData = (Array.isArray(moveDataList) && moveDataList.length) ? moveDataList : [{ fen: "start", notation: "Start", move_number: "", from: null, to: null }];
+    const container = document.getElementById("board");
+
+    const board = new Chessboard(container, {
+        position: validMoveData[0].fen,
+        assetsUrl: "{% static 'assets/' %}", 
+        style: {
+            pieces: { file: "pieces/standard.svg" } 
+        },
+        // 4. AKTIFKAN EXTENSION
+        extensions: [
+            {class: Markers} 
+        ],
+        responsive: true
+    });
+
+    // ... (Variabel UI tetap sama) ...
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
+    const playBtn = document.getElementById("playBtn");
+    const moveIndexEl = document.getElementById("moveIndex");
+    const moveCountEl = document.getElementById("moveCount");
+    const moveRange = document.getElementById("moveRange");
+    const draggableToggle = document.getElementById("draggableToggle");
+
+    let idx = 0;
+    const maxMoves = Math.max(0, validMoveData.length - 1);
+    moveCountEl.textContent = maxMoves;
+    moveRange.max = maxMoves;
+
+    // ... (Fungsi renderMoveList tetap sama) ...
+    function renderMoveList() {
+        const tbody = document.getElementById("moveTableBody");
+        tbody.innerHTML = "";
+        for (let i = 1; i < validMoveData.length; i += 2) {
+            const whiteMove = validMoveData[i];
+            const blackMove = validMoveData[i + 1]; 
+            const row = document.createElement("tr");
+            const numCell = document.createElement("td");
+            numCell.className = "text-white-50 border-secondary small align-middle";
+            numCell.textContent = whiteMove.move_number.replace('.', ''); 
+            row.appendChild(numCell);
+            const whiteCell = document.createElement("td");
+            whiteCell.textContent = whiteMove.notation;
+            whiteCell.id = "move-" + i;
+            whiteCell.className = "move-item cursor-pointer border-secondary text-white py-2";
+            whiteCell.onclick = () => setIndex(i);
+            row.appendChild(whiteCell);
+            const blackCell = document.createElement("td");
+            blackCell.className = "border-secondary text-white py-2";
+            if (blackMove) {
+                blackCell.textContent = blackMove.notation;
+                blackCell.id = "move-" + (i + 1);
+                blackCell.className += " move-item cursor-pointer";
+                blackCell.onclick = () => setIndex(i + 1);
+            }
+            row.appendChild(blackCell);
+            tbody.appendChild(row);
+        }
+    }
+
+    // 5. FUNGSI SET INDEX DENGAN MARKER
+    function setIndex(i) {
+        idx = Math.max(0, Math.min(i, maxMoves));
+        
+        if (validMoveData[idx]) {
+            // Update Papan
+            board.setPosition(validMoveData[idx].fen, true);
+
+            // Update Marker
+            const move = validMoveData[idx];
+            
+            // Pastikan fungsi marker ada
+            if (board.removeMarkers) {
+                board.removeMarkers(); 
+                if (move.from && move.to) {
+                    // Gunakan MARKER_TYPE.frame yang diimpor dari Markers.js
+                    board.addMarker(MARKER_SQUARE, move.from);
+                    board.addMarker(MARKER_SQUARE, move.to);
+                }
+            }
+        }
+        
+        moveIndexEl.textContent = idx;
+        moveRange.value = idx;
+        highlightActiveMove();
+    }
+
+    function highlightActiveMove() {
+        const allMoves = document.querySelectorAll(".move-item");
+        allMoves.forEach(el => {
+            el.style.backgroundColor = "transparent";
+            el.classList.remove("fw-bold", "text-dark", "bg-warning");
+            el.classList.add("text-white");
+        });
+        const activeMove = document.getElementById("move-" + idx);
+        if (activeMove) {
+            activeMove.classList.remove("text-white");
+            activeMove.classList.add("bg-warning", "text-dark", "fw-bold");
+            activeMove.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+    }
+
+    prevBtn.addEventListener("click", () => setIndex(idx - 1));
+    nextBtn.addEventListener("click", () => setIndex(idx + 1));
+    moveRange.addEventListener("input", (e) => setIndex(parseInt(e.target.value, 10)));
+
+    let playInterval = null;
+    playBtn.addEventListener("click", () => {
+        if (playInterval) {
+            clearInterval(playInterval);
+            playInterval = null;
+            playBtn.textContent = "▶ Play";
+            playBtn.classList.replace("btn-danger", "btn-outline-primary");
+        } else {
+            if (draggableToggle.checked) draggableToggle.click();
+            playBtn.textContent = "⏸ Pause";
+            playBtn.classList.replace("btn-outline-primary", "btn-danger");
+            playInterval = setInterval(() => {
+                if (idx < maxMoves) setIndex(idx + 1);
+                else { 
+                    clearInterval(playInterval); 
+                    playInterval = null; 
+                    playBtn.textContent = "▶ Play"; 
+                    playBtn.classList.replace("btn-danger", "btn-outline-primary");
+                }
+            }, 800);
+        }
+    });
+
+    draggableToggle.addEventListener("change", (ev) => {
+        if (ev.target.checked) {
+            alert("Fitur geser sementara dimatikan.");
+            ev.target.checked = false;
+        } 
+    });
+
+    renderMoveList();
+    setIndex(0);
+</script>
 {% endblock %}

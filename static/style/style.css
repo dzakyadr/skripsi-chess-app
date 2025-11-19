@@ -30,6 +30,13 @@
     font-weight: 600; /* 600 biasanya untuk SemiBold */
     font-style: normal;
 }
+
+h1, h2, h3 {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 520;
+    letter-spacing: 0.5px;
+}
+
 :root {
     --bg-body: #1e293b;
     --bg-card: #20293a;
@@ -91,7 +98,7 @@ body {
     color: var(--color-primary) !important;
     font-family: 'Barich', sans-serif;
     font-weight: bold;
-    font-size: 2rem;
+    font-size: 2.2rem;
     letter-spacing: 1.5px;
     text-shadow: 0 0 10px rgba(0, 242, 234, 0.5); 
     text-decoration: none;
@@ -147,13 +154,13 @@ body {
     background-color: #0f131a;
     color: var(--text-main);
     border-color: var(--color-primary);
-    box-shadow: 0 0 10px rgba(0, 242, 234, 0.3);
+    box-shadow: 0 0 10px rgba(242, 0, 210, 0.3);
 }
 
 /* --- LINK BIASA --- */
 a {
     color: var(--color-primary);
-    text-decoration: none;
+    text-decoration: none !important;
 }
 a:hover {
     color: var(--color-primary-hover);

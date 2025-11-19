@@ -290,5 +290,11 @@
       fill: white; }
     .cm-chessboard.black-and-white .coordinates .coordinate.white {
       fill: #909090; }
+/* ========================================= */
+/* 4. Marker Langkah (Titik Cyan) */
+.cm-chessboard .markers-layer .marker {
+    fill: #04e976 !important;
+    opacity: 0.5 !important;
+}
 
 /*# sourceMappingURL=chessboard.css.map */

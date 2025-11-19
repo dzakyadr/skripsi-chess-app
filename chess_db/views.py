@@ -99,17 +99,12 @@ def upload_pgn(request):
 
 
 def game_list(request):
-    """
-    Dukungan query params:
-      - q: search string (search in white_player, black_player, event, opening)
-      - sort: field to sort by (created, date, event, white, black, id)
-      - order: asc atau desc
-      - page: nomor halaman
-      - per_page: items per page (default 10)
-    """
+    # Ambil semua game
     qs = Game.objects.all()
 
-    # 1) Search
+    # ---------------------------------------------------------
+    # 1) Search (Pencarian) - BAGIAN INI TETAP SAMA
+    # ---------------------------------------------------------
     q = request.GET.get('q', '').strip()
     if q:
         qs = qs.filter(
@@ -119,24 +114,34 @@ def game_list(request):
             Q(opening__icontains=q)
         )
 
-    # 2) Sorting
-    allowed_sorts = {
-        'id': 'id',
-        'event': 'event',
-        'white': 'white_player',
-        'black': 'black_player',
-        'date': 'game_date',
-        'created': 'created_at',
-    }
-    sort = request.GET.get('sort', 'created')   # default: latest by created_at
-    sort_field = allowed_sorts.get(sort, 'created_at')
-    order = request.GET.get('order', 'desc')
-    if order == 'asc':
-        qs = qs.order_by(sort_field)
-    else:
-        qs = qs.order_by('-' + sort_field)
+    # ---------------------------------------------------------
+    # 2) Sorting (Pengurutan) - BAGIAN INI KITA UBAH TOTAL
+    # ---------------------------------------------------------
+    # Kita tidak lagi pakai 'order' (asc/desc) terpisah.
+    # Kita gabungkan logikanya dalam satu kamus (dictionary).
+    
+    sort_param = request.GET.get('sort', 'newest') # Default: 'newest'
 
-    # 3) Pagination
+    sort_options = {
+        'newest': '-game_date',      # Terbaru (Tanggal Descending)
+        'oldest': 'game_date',       # Terlama (Tanggal Ascending)
+        'white_az': 'white_player',  # Putih A-Z
+        'white_za': '-white_player', # Putih Z-A
+        'black_az': 'black_player',  # Hitam A-Z
+        'black_za': '-black_player', # Hitam Z-A
+        'event_az': 'event',         # Event A-Z
+        'id': '-id',                 # ID (Default fallback)
+    }
+
+    # Ambil nama kolom dari kamus. Jika tidak ketemu, pakai '-game_date'
+    order_by_field = sort_options.get(sort_param, '-game_date')
+    
+    # Terapkan pengurutan
+    qs = qs.order_by(order_by_field)
+
+    # ---------------------------------------------------------
+    # 3) Pagination (Halaman) - BAGIAN INI TETAP SAMA
+    # ---------------------------------------------------------
     try:
         per_page = int(request.GET.get('per_page', 10))
         if per_page <= 0 or per_page > 200:
@@ -146,6 +151,7 @@ def game_list(request):
 
     paginator = Paginator(qs, per_page)
     page = request.GET.get('page', 1)
+    
     try:
         games_page = paginator.page(page)
     except PageNotAnInteger:
@@ -153,25 +159,28 @@ def game_list(request):
     except EmptyPage:
         games_page = paginator.page(paginator.num_pages)
 
-    # 4) offset untuk nomor urut global (pertama item index di halaman ini)
+    # 4) Offset untuk nomor urut global
     try:
         current_page_number = int(games_page.number)
     except Exception:
         current_page_number = 1
     offset = (current_page_number - 1) * per_page
 
+    # ---------------------------------------------------------
+    # 5) Context - KITA UPDATE SEDIKIT
+    # ---------------------------------------------------------
     context = {
-        'games': games_page,          # paginated page object
+        'games': games_page,
         'q': q,
-        'sort': sort,
-        'order': order,
+        'sort': sort_param,  # Kita kirim nilai sort (misal: 'newest', 'white_az')
+        # 'order': order,    <-- HAPUS INI (Sudah tidak dipakai)
         'per_page': per_page,
         'paginator': paginator,
-        'offset': offset,            # kirim offset ke template
+        'offset': offset,
     }
+    
     return render(request, 'chess_db/game_list.html', context)
 
-# --- Fungsi cerdas barumu, kita pertahankan! ---
 
 
 def game_detail(request, game_id):
@@ -201,38 +210,41 @@ def game_detail(request, game_id):
         move_data_list.append({
             "move_number": "Start",
             "notation": "Posisi Awal",
-            "fen": board.fen()
+            "fen": board.fen(),
+            "from": None, # <-- TAMBAHKAN INI
+            "to": None    # <-- TAMBAHKAN INI
         })
 
         # 2. Loop semua langkah di PGN
         for move in g.mainline_moves():
-            # Tentukan nomor langkah (misal: "1." atau "1...")
-            move_number_str = ""
             if board.turn == chess.WHITE:
                 move_number_str = f"{board.fullmove_number}."
             else:
                 move_number_str = f"{board.fullmove_number}..."
 
-            # Dapatkan notasi (misal: "e4" atau "Nf3")
             notation_str = board.san(move)
-
-            # Lakukan langkah di papan virtual
+            
+            # --- AMBIL KOORDINAT GERAKAN ---
+            from_sq = chess.square_name(move.from_square) # misal: "e2"
+            to_sq = chess.square_name(move.to_square)     # misal: "e4"
+            
             board.push(move)
 
             # Simpan semua data
             move_data_list.append({
                 "move_number": move_number_str,
                 "notation": notation_str,
-                "fen": board.fen()
+                "fen": board.fen(),
+                "from": from_sq, # <-- KIRIM KE TEMPLATE
+                "to": to_sq      # <-- KIRIM KE TEMPLATE
             })
 
     except Exception as e:
-        print(f"Error parsing FEN/Move list for game {game_id}: {e}")
-        move_data_list = [] # Kosongkan jika ada error
+        print(f"Error: {e}")
+        move_data_list = []
 
     context = {
         'game': game,
-        'notes_form': notes_form,
         'move_data_list': move_data_list, 
     }
     return render(request, 'chess_db/game_detail.html', context)

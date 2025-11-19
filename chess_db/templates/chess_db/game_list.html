@@ -18,27 +18,24 @@
         </div>
       </div>
 
-      <div class="col-6 col-md-2">
-        <div class="input-group">
-          <select name="sort" class="form-select bg-dark text-white border-secondary">
-            <option value="created" {% if sort == 'created' %}selected{% endif %}>Newest</option>
-            <option value="date" {% if sort == 'date' %}selected{% endif %}>Tanggal Main</option>
-            <option value="white" {% if sort == 'white' %}selected{% endif %}>Putih (A-Z)</option>
-            <option value="black" {% if sort == 'black' %}selected{% endif %}>Hitam (A-Z)</option>
-            <option value="event" {% if sort == 'event' %}selected{% endif %}>Event</option>
-            <option value="id" {% if sort == 'id' %}selected{% endif %}>ID</option>
-          </select>
-        </div>
-      </div>
+      <div class="col-6 col-md-auto">
+        <div class="input-group input-group">
+        <select name="sort" class="form-select bg-dark text-white border-secondary">
+        <option value="newest" {% if sort == 'newest' %}selected{% endif %}>📅 Newest</option>
+        <option value="oldest" {% if sort == 'oldest' %}selected{% endif %}>📅 Oldest</option>
+        <option disabled>──────────</option>
+        <option value="white_az" {% if sort == 'white_az' %}selected{% endif %}>⚪ Putih (A-Z)</option>
+        <option value="white_za" {% if sort == 'white_za' %}selected{% endif %}>⚪ Putih (Z-A)</option>
+        <option disabled>──────────</option>
+        <option value="black_az" {% if sort == 'black_az' %}selected{% endif %}>⚫ Hitam (A-Z)</option>
+        <option value="black_za" {% if sort == 'black_za' %}selected{% endif %}>⚫ Hitam (Z-A)</option>
+        <option disabled>──────────</option>
+        <option value="event_az" {% if sort == 'event_az' %}selected{% endif %}>🏆 Event (A-Z)</option>
+      </select>
+    </div>
+  </div>
 
-      <div class="col-6 col-md-2">
-        <select name="order" class="form-select bg-dark text-white border-secondary">
-          <option value="desc" {% if order == 'desc' %}selected{% endif %}>Menurun</option>
-          <option value="asc" {% if order == 'asc' %}selected{% endif %}>Menaik</option>
-        </select>
-      </div>
-
-      <div class="col-12 col-md-2 d-flex gap-2">
+      <div class="col-12 col-md-auto d-flex gap-2">
         <button type="submit" class="btn btn-primary w-100">Filter</button>
         <a href="{% url 'game_list' %}" class="btn btn-outline-secondary" title="Reset">↻</a>
       </div>
@@ -74,7 +71,7 @@
         <td style="padding:6px; vertical-align:top;">{{ g.result|default:"-" }} </td>
         <td style="padding:6px; vertical-align:top;">
             {% if g.tags %}
-                <span style="font-family: monospace; font-size: 0.9em; background-color: #F875AA; padding: 2px 5px; border-radius: 4px;">
+                <span style="font-family: monospace; font-size: 0.9em; background-color: #0046FF; padding: 2px 5px; border-radius: 4px;">
                     {{ g.tags }}
                 </span>
             {% else %}
@@ -86,7 +83,7 @@
             <form method="post" action="{% url 'game_delete' g.id %}" style="display: inline; margin-left: 8px;" onsubmit="return confirm('Apakah Anda yakin ingin menghapus game ini?');">
         {% csrf_token %}
         <button type="submit" style="color: #dc3545; background: none; border: none; padding: 0; font-family: inherit; font-size: inherit; cursor: pointer; text-decoration: none;">
-            Hapus
+            Delete
         </button>
         </form>
         </td>

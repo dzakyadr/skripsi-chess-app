@@ -1,78 +1,135 @@
 {% extends "base.html" %}
 {% load static %}
+
+{% block title %}Upload PGN - Chesstify{% endblock %}
+
 {% block content %}
-<h1>Upload PGN</h1>
 
-<!-- Pesan dari Django messages framework -->
-{% if messages %}
-  <ul class="messages">
-    {% for message in messages %}
-      <li class="{{ message.tags }}">{{ message }}</li>
-    {% endfor %}
-  </ul>
-{% endif %}
+<div class="row justify-content-center">
+  <div class="col-lg-6 col-md-8">
 
-<!-- Form upload -->
-<form method="post" enctype="multipart/form-data" id="uploadForm">
-  {% csrf_token %}
-  <p>
-    {{ form.pgn_file.label_tag }}
-    {{ form.pgn_file }}
-  </p>
-  <p><button type="submit">Upload PGN</button></p>
-</form>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold m-0 text-white">📂 Upload PGN</h2>
+        <a href="{% url 'game_list' %}" class="btn btn-outline-secondary btn-sm">
+            &larr; Back
+        </a>
+    </div>
 
-<hr>
+    <div class="card shadow-lg border-secondary" style="background-color: var(--bg-card);">
+      <div class="card-header bg-secondary bg-opacity-10 border-secondary py-3">
+        <h5 class="m-0 text-info fw-bold text-uppercase small">
+            Select Game File
+        </h5>
+      </div>
+      
+      <div class="card-body p-4">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} mb-3">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
 
-<p><a href="{% url 'game_list' %}">Kembali ke Daftar Permainan</a></p>
+        <form method="post" enctype="multipart/form-data" id="uploadForm">
+            {% csrf_token %}
+            
+            <div class="mb-4">
+                <label for="id_pgn_file" class="form-label text-white mb-2">File PGN (.pgn)</label>
+                {{ form.pgn_file }}
+                <div class="form-text text-muted mt-2">
+                    Pastikan format file adalah .pgn standar.
+                </div>
+                <div id="fileNameDisplay" class="mt-2 text-info fw-bold small"></div>
+            </div>
 
-<!-- Optional: contoh PGN kecil agar user bisa coba (tidak wajib) -->
-<details style="margin-top:1em;">
-  <summary><strong>Contoh PGN (klik untuk lihat)</strong></summary>
-  <pre style="background:#f8f8f8; padding:8px; border-radius:4px;">
-[Event "Demo"]
-[Site "Local"]
-[Date "2025.10.01"]
-[Round "1"]
-[White "White"]
-[Black "Black"]
+            <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">
+                🚀 Upload Sekarang
+            </button>
+        </form>
+      </div>
+      
+      <div class="card-footer bg-dark border-secondary p-0">
+        <div class="accordion accordion-flush" id="accordionExample">
+            <div class="accordion-item bg-transparent">
+              <h2 class="accordion-header" id="headingOne">
+                <button class="accordion-button collapsed bg-transparent text-white-50 shadow-none" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne">
+                  <small>💡 Lihat Contoh Format PGN</small>
+                </button>
+              </h2>
+              <div id="collapseOne" class="accordion-collapse collapse" data-bs-parent="#accordionExample">
+                <div class="accordion-body pt-0">
+                    <pre class="p-3 rounded border border-secondary text-white-50 small mb-0" style="background-color: #0f131a; font-family: 'JetBrains Mono', monospace;">
+[Event "Latihan"]
+[Site "Jakarta"]
+[Date "2025.11.19"]
+[White "Dzaky"]
+[Black "Stockfish"]
 [Result "1-0"]
 
-1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 1-0
-  </pre>
-</details>
+1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 1-0</pre>
+                </div>
+              </div>
+            </div>
+          </div>
+      </div>
+    </div>
 
+  </div>
+</div>
 
 <style>
-  body { font-family: sans-serif; }
-  .messages { list-style-type: none; padding: 0; margin: 0 0 1em 0; }
-  .messages li.success { color: green; }
-  .messages li.error { color: red; }
-  .messages li.warning { color: orange; }
-  #uploadForm { max-width: 640px; }
-  pre { background:#f8f8f8; padding:8px; border-radius:4px; }
+    /* Styling khusus untuk input file agar gelap */
+    input[type="file"] {
+        background-color: #0f131a;
+        color: #e0e6ed;
+        border: 1px solid #2d3748;
+        padding: 10px;
+        border-radius: 6px;
+        width: 100%;
+        cursor: pointer;
+    }
+    
+    input[type="file"]::file-selector-button {
+        background-color: #2d3748;
+        color: white;
+        border: none;
+        padding: 8px 15px;
+        border-radius: 4px;
+        margin-right: 15px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    input[type="file"]::file-selector-button:hover {
+        background-color: var(--color-primary);
+        color: black;
+    }
+
+    /* Accordion Dark Mode override */
+    .accordion-button::after {
+        filter: invert(1); /* Biar panahnya jadi putih */
+    }
+    .accordion-button:not(.collapsed) {
+        color: var(--color-primary);
+        background-color: rgba(0, 242, 234, 0.05);
+    }
 </style>
 
 <script>
-  // UX nicety: tampilkan nama file saat user pilih file
-  document.addEventListener('DOMContentLoaded', function() {
-    const fileInput = document.querySelector('input[type="file"][name="pgn_file"]');
-    if (!fileInput) return;
-    const label = fileInput.previousElementSibling || null;
-    fileInput.addEventListener('change', (e) => {
-      if (e.target.files && e.target.files.length) {
-        const name = e.target.files[0].name;
-        const info = document.createElement('div');
-        info.style.marginTop = '8px';
-        info.textContent = 'File pilih: ' + name;
-        // replace previous info if ada
-        const prev = document.getElementById('fileSelectedInfo');
-        if (prev) prev.remove();
-        info.id = 'fileSelectedInfo';
-        fileInput.parentNode.appendChild(info);
-      }
+    document.addEventListener('DOMContentLoaded', function() {
+        const fileInput = document.querySelector('input[type="file"]');
+        const displayDiv = document.getElementById('fileNameDisplay');
+        
+        if (fileInput) {
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files && e.target.files.length) {
+                    const name = e.target.files[0].name;
+                    displayDiv.innerHTML = `✅ File terpilih: <u>${name}</u>`;
+                } else {
+                    displayDiv.innerHTML = '';
+                }
+            });
+        }
     });
-  });
 </script>
 
 {% endblock %}
