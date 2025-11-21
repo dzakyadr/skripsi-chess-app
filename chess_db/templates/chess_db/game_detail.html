@@ -8,7 +8,7 @@
   <h2 class="fw-bold m-0 text-white">
     <span class="text-primary">{{ game.white_player }}</span> vs <span class="text-danger">{{ game.black_player }}</span>
   </h2>
-  <a href="{% url 'game_edit' game.id %}" class="btn btn-outline-light btn-sm">✏️ Edit Info Game</a>
+  <a href="{% url 'game_edit' game.id %}" class="btn btn-outline-light btn-sm">Edit Info Game</a>
 </div>
 
 <div class="card mb-4 shadow-sm border-secondary" style="background-color: var(--bg-card);">
@@ -22,12 +22,12 @@
       <div class="col-md-4">
         <p class="mb-1 text-info small fw-bold text-uppercase">Result & Opening</p>
         <div class="text-white fw-bold">{{ game.result|default:"-" }}</div>
-        <div class="text-white-50">{{ game.opening|default:"-" }} <span class="badge bg-secondary">{{ game.eco_code|default:"" }}</span></div>
+        <div class="text-white-50">{{ game.opening|default:"" }} <span class="badge bg-secondary">{{ game.eco_code|default:"" }}</span></div>
       </div>
       <div class="col-md-4">
         <p class="mb-1 text-info small fw-bold text-uppercase">Ratings & Tags</p>
         <div class="text-white">⚪ {{ game.white_elo|default:"?" }} / ⚫ {{ game.black_elo|default:"?" }}</div>
-        <div class="mt-1">{% if game.tags %}<span class="badge bg-primary text-dark">{{ game.tags }}</span>{% else %}<span class="text-white-50 small">- No Tags -</span>{% endif %}</div>
+        <div class="mt-1">{% if game.tags %}<span class="badge bg-primary text-dark">{{ game.tags }}</span>{% else %}<span class="text-white-50 small">No Tags</span>{% endif %}</div>
       </div>
     </div>
   </div>
@@ -65,11 +65,11 @@
 
     {% if game.notes %}
     <div class="card mt-4 border-warning bg-transparent">
-      <div class="card-header bg-warning bg-opacity-10 text-warning fw-bold border-warning">📝 Catatan Pribadi</div>
+      <div class="card-header bg-warning bg-opacity-10 text-warning fw-bold border-warning">Notes</div>
       <div class="card-body">
         <form method="post">{% csrf_token %}
             <div class="mb-2"><textarea name="notes" class="form-control bg-dark text-white border-secondary" rows="4">{{ game.notes|default:"" }}</textarea></div>
-            <div class="text-end"><button type="submit" class="btn btn-warning btn-sm fw-bold text-dark">💾 Simpan</button></div>
+            <div class="text-end"><button type="submit" class="btn btn-warning btn-sm fw-bold text-dark">Save</button></div>
         </form>
       </div>
     </div>
@@ -78,7 +78,7 @@
 
   <div class="col-lg-5 col-xl-6">
     <div class="card shadow-sm bg-dark border-secondary mb-3">
-        <div class="card-header bg-secondary bg-opacity-25 text-white border-secondary py-2"><small class="fw-bold">📋 MOVE LIST</small></div>
+        <div class="card-header bg-secondary bg-opacity-25 text-white border-secondary py-2"><small class="fw-bold">MOVE LIST</small></div>
         <div class="card-body p-0" style="height: 400px; overflow-y: auto;">
             <table class="table table-dark table-striped table-hover table-sm mb-0 text-center" style="font-family: 'JetBrains Mono', monospace;">
                 <thead class="sticky-top bg-secondary"><tr><th class="text-white-50" style="width: 15%;">#</th><th style="width: 42.5%;">White</th><th style="width: 42.5%;">Black</th></tr></thead>
@@ -105,10 +105,10 @@
 
 <script type="module">
     import { Chessboard } from "cm-chessboard";
-    // 3. IMPORT MARKERS DARI SRC (LOKASI YANG BENAR)
     import { Markers, MARKER_TYPE } from "{% static 'src/extensions/markers/Markers.js' %}";
 
     const MARKER_SQUARE = { class: "marker-square", slice: "markerSquare" };
+    const MARKER_CHECK  = { class: "marker-square-danger", slice: "markerSquare" };
 
     const moveDataList = JSON.parse(document.getElementById("move-data").textContent) || [];
     const validMoveData = (Array.isArray(moveDataList) && moveDataList.length) ? moveDataList : [{ fen: "start", notation: "Start", move_number: "", from: null, to: null }];
@@ -118,16 +118,20 @@
         position: validMoveData[0].fen,
         assetsUrl: "{% static 'assets/' %}", 
         style: {
+            cssClass: "green",
             pieces: { file: "pieces/standard.svg" } 
         },
-        // 4. AKTIFKAN EXTENSION
-        extensions: [
-            {class: Markers} 
+    
+        extensions: [{
+            class: Markers,
+            props: {
+                    sprite: "extensions/markers/markers.svg" 
+                } 
+              }
         ],
         responsive: true
     });
 
-    // ... (Variabel UI tetap sama) ...
     const prevBtn = document.getElementById("prevBtn");
     const nextBtn = document.getElementById("nextBtn");
     const playBtn = document.getElementById("playBtn");
@@ -141,7 +145,6 @@
     moveCountEl.textContent = maxMoves;
     moveRange.max = maxMoves;
 
-    // ... (Fungsi renderMoveList tetap sama) ...
     function renderMoveList() {
         const tbody = document.getElementById("moveTableBody");
         tbody.innerHTML = "";
@@ -172,27 +175,37 @@
         }
     }
 
-    // 5. FUNGSI SET INDEX DENGAN MARKER
     function setIndex(i) {
         idx = Math.max(0, Math.min(i, maxMoves));
         
         if (validMoveData[idx]) {
-            // Update Papan
-            board.setPosition(validMoveData[idx].fen, true);
+        board.setPosition(validMoveData[idx].fen, true);
 
-            // Update Marker
-            const move = validMoveData[idx];
+        const move = validMoveData[idx];
+        
+        if (board.removeMarkers) {
+            board.removeMarkers(); 
             
-            // Pastikan fungsi marker ada
-            if (board.removeMarkers) {
-                board.removeMarkers(); 
-                if (move.from && move.to) {
-                    // Gunakan MARKER_TYPE.frame yang diimpor dari Markers.js
-                    board.addMarker(MARKER_SQUARE, move.from);
-                    board.addMarker(MARKER_SQUARE, move.to);
+            if (move.from && move.to) {
+                let markerToUse = MARKER_SQUARE; // Default Kuning
+
+                // Cek Notasi: Apakah mengandung tanda '+' (Skak)?
+                // move.notation bisa string "Nf3+" atau "Qxe4+"
+                if (move.notation && move.notation.includes("+")) {
+                    markerToUse = MARKER_CHECK; // Ganti jadi Merah
                 }
+                
+                // Bisa juga tambah logika untuk Skakmat (#)
+                if (move.notation && move.notation.includes("#")) {
+                    markerToUse = MARKER_CHECK; 
+                }
+
+                // Pasang marker yang sudah dipilih
+                board.addMarker(markerToUse, move.from);
+                board.addMarker(markerToUse, move.to);
             }
         }
+    }
         
         moveIndexEl.textContent = idx;
         moveRange.value = idx;

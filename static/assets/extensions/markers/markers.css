@@ -75,10 +75,30 @@
   stroke-width: 3px;
   opacity: 0.4;
 }
-.cm-chessboard .markers .marker.marker-square {
-  fill: black;
-  opacity: 0.11;
+
+@keyframes pulse-opacity {
+    0% { opacity: 0.3; }
+    50% { opacity: 0.7; }
+    100% { opacity: 0.3; }
 }
+
+.cm-chessboard .markers .marker.marker-square {
+  fill: #947518;
+  opacity: 0.4;   
+  animation: pulse-opacity 2s infinite ease-in-out;
+}
+
+.cm-chessboard .markers .marker.marker-square-danger {
+    fill: #ff0055 !important; /* Merah Neon */
+    opacity: 0.5 !important;
+}
+
+/* Custom Marker: Kotak Hijau (Untuk Langkah Terbaik) */
+.cm-chessboard .markers .marker.marker-square-success {
+    fill: #00ff00 !important; /* Hijau Neon */
+    opacity: 0.5 !important;
+}
+
 .cm-chessboard .markers .marker.marker-dot {
   fill: black;
   opacity: 0.2;
