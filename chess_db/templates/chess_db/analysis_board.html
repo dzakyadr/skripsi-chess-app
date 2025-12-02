@@ -1,0 +1,389 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Analysis Board{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold m-0 text-white">🧪 Analysis Board</h2>
+        <p class="text-white-50 mb-0">Analisis langkah demi langkah.</p>
+    </div>
+    <div class="btn-group">
+        <button id="flipBtn" class="btn btn-outline-light btn-sm">Flip Board</button>
+        <a href="{% url 'analysis_board' %}" class="btn btn-warning btn-sm fw-bold text-dark">🔄 Reset New Game</a>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-7 col-xl-6">
+        
+        <link rel="stylesheet" href="{% static 'assets/chessboard.css' %}" />
+        <link rel="stylesheet" href="{% static 'assets/extensions/markers/markers.css' %}" />
+        <link rel="stylesheet" href="{% static 'assets/extensions/arrows/arrows.css' %}" />
+        <link rel="stylesheet" href="{% static 'assets/extensions/promotion-dialog/promotion-dialog.css' %}" />
+
+        <div class="card shadow-sm border-0 bg-dark">
+            <div class="card-body p-2 d-flex justify-content-center rounded">
+                <div id="board" style="width: 100%; max-width: 600px; aspect-ratio: 1/1;"></div>
+            </div>
+        </div>
+
+        <div class="mt-3">
+            <div class="progress bg-secondary" style="height: 8px; margin-bottom: 10px;">
+                <div id="evalBar" class="progress-bar bg-info" role="progressbar" style="width: 50%;"></div>
+            </div>
+            <div class="alert alert-info border-secondary text-dark d-flex justify-content-between align-items-center py-2">
+                <span id="status" class="small">Ready</span>
+                <span class="badge bg-dark border border-info text-info" id="evalScore">Eval: 0.0</span>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-center gap-2 mt-2 bg-dark p-2 rounded border border-secondary">
+            <button id="btnStart" class="btn btn-secondary btn-sm px-3" title="Awal Permainan">|&lt;&lt;</button>
+            <button id="btnPrev" class="btn btn-secondary btn-sm px-3" title="Mundur (Undo)">&lt;</button>
+            <button id="btnNext" class="btn btn-secondary btn-sm px-3" title="Maju">&gt;</button>
+            <button id="btnEnd" class="btn btn-secondary btn-sm px-3" title="Akhir Permainan">&gt;&gt;|</button>
+        </div>
+
+    </div>
+
+    <div class="col-lg-5 col-xl-6">
+        
+        <div class="card shadow-sm bg-dark border-secondary mb-3 h-100" style="max-height: 500px;">
+            <div class="card-header bg-secondary bg-opacity-25 text-white border-secondary py-2">
+                <small class="fw-bold">📋 MOVE LIST</small>
+            </div>
+            
+            <div class="card-body p-0" style="height: 400px; overflow-y: auto;">
+                <table class="table table-dark table-striped table-hover table-sm mb-0 text-center" style="font-family: 'JetBrains Mono', monospace;">
+                    <thead class="sticky-top bg-secondary">
+                        <tr>
+                            <th class="text-white-50" style="width: 15%;">#</th>
+                            <th style="width: 42.5%;">White</th>
+                            <th style="width: 42.5%;">Black</th>
+                        </tr>
+                    </thead>
+                    <tbody id="moveTableBody">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card bg-dark border-secondary">
+            <div class="card-header border-secondary text-white-50 small fw-bold">PGN</div>
+            <div class="card-body p-0">
+                <textarea id="pgnOutput" class="form-control bg-black text-white border-0 p-3" 
+                          style="font-family: 'JetBrains Mono', monospace; height: 150px; resize: vertical;" readonly></textarea>
+            </div>
+            <div class="card-footer border-secondary bg-dark">
+                <input type="text" id="fenInput" class="form-control form-control-sm bg-black text-info border-secondary mb-1" readonly>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ initial_pgn|json_script:"initial-pgn" }}
+{{ initial_fen|json_script:"initial-fen" }}
+
+<script type="importmap">
+{
+    "imports": {
+        "cm-chessboard": "{% static 'src/Chessboard.js' %}"
+    }
+}
+</script>
+
+<script type="module">
+    import { Chessboard, INPUT_EVENT_TYPE, COLOR } from "cm-chessboard";
+    import { Markers, MARKER_TYPE } from "{% static 'src/extensions/markers/Markers.js' %}";
+    import { Arrows, ARROW_TYPE } from "{% static 'src/extensions/arrows/Arrows.js' %}";
+    import { PromotionDialog } from "{% static 'src/extensions/promotion-dialog/PromotionDialog.js' %}";
+    import { Chess } from "{% static 'js/chess.js' %}";
+
+    // SETUP
+    const container = document.getElementById("board");
+    const game = new Chess(); 
+    const stockfish = new Worker("{% static 'js/stockfish.js' %}");
+    
+    let redoStack = []; // Tumpukan langkah masa 
+    let mainLineMoves = []; // Menyimpan daftar langkah game asli (SAN)
+    let isMainLine = true;
+
+    // DATA
+    const initialPgn = JSON.parse(document.getElementById("initial-pgn").textContent);
+    const initialFen = JSON.parse(document.getElementById("initial-fen").textContent);
+
+    // --- LOGIKA LOAD (START FROM 0) ---
+    if (initialPgn) {
+        try { 
+            // Load untuk menghafal
+            game.loadPgn(initialPgn); 
+            // Simpan semua langkah game asli ke array
+            mainLineMoves = game.history(); 
+            
+            // Reset untuk mulai dari awal (atau FEN tertentu)
+            // Kita pakai teknik rewind yang kemarin
+            if (initialFen && initialFen !== "start") {
+                const targetFenBase = initialFen.split(" ")[0];
+                while (game.fen().split(" ")[0] !== targetFenBase) {
+                    if (!game.undo()) break;
+                }
+                // Isi redoStack agar tombol Next jalan
+                // (Tapi redoStack ini akan hilang kalau kita buat variasi, 
+                //  makanya kita butuh mainLineMoves sebagai cadangan abadi)
+                 // Trick: Re-play history dari mainLineMoves nanti
+            } else {
+                game.reset();
+            }
+        } catch(e) { console.error("PGN Error", e); }
+    } else if (initialFen) {
+         try { game.load(initialFen); } catch(e) { game.reset(); }
+    } else {
+        game.reset();
+    }
+
+    // INIT BOARD
+    const board = new Chessboard(container, {
+        position: game.fen(),
+        assetsUrl: "{% static 'assets/' %}", 
+        style: { cssClass: "green", pieces: { file: "pieces/standard.svg" } },
+        extensions: [
+            { class: Markers, props: { autoMarkers: MARKER_TYPE.frame } },
+            { class: Arrows },
+            { class: PromotionDialog } 
+        ],
+        responsive: true
+    });
+
+    // --- UPDATE UTAMA (PAPAN + STOCKFISH + TABEL) ---
+    function updateBoardAndAI() {
+        const currentFen = game.fen();
+        
+        // 1. Visual Papan
+        board.setPosition(currentFen, true);
+        document.getElementById("fenInput").value = currentFen;
+        document.getElementById("pgnOutput").value = game.pgn();
+
+        checkMainLineStatus();
+
+        // 2. Stockfish
+        board.removeArrows();
+        stockfish.postMessage('stop'); 
+        stockfish.postMessage('position fen ' + currentFen);
+        stockfish.postMessage('go depth 15'); 
+
+        // 3. Render Move List Table
+        renderMoveListTable();
+    }
+
+    function checkMainLineStatus() {
+        const currentHistory = game.history();
+        const moveIndex = currentHistory.length; // Langkah ke berapa kita sekarang
+
+        // Cek apakah sejarah kita saat ini SAMA PERSIS dengan awal game asli?
+        let match = true;
+        for(let i=0; i<moveIndex; i++) {
+            if (currentHistory[i] !== mainLineMoves[i]) {
+                match = false;
+                break;
+            }
+        }
+        isMainLine = match;
+
+        // Tampilkan Indikator di Status
+        const statusEl = document.getElementById("status");
+        let turnText = (game.turn() === 'w' ? "White" : "Black") + " to move";
+        
+        if (isMainLine && moveIndex < mainLineMoves.length) {
+            // KITA DI JALUR ASLI -> Tampilkan Langkah Selanjutnya
+            const nextMove = mainLineMoves[moveIndex];
+            statusEl.innerHTML = `${turnText} | <span class="text-warning cursor-pointer" onclick="playMainMove('${nextMove}')">👉 Game Asli: <b>${nextMove}</b></span>`;
+        } else if (!isMainLine) {
+            // KITA MELENCENG -> Tampilkan Info Variasi
+            statusEl.innerHTML = `${turnText} | <span class="text-info">🧪 Variasi Analisis</span>`;
+        } else {
+            statusEl.textContent = turnText;
+        }
+
+        if (game.isCheck()) statusEl.innerHTML += " <span class='text-danger'>(CHECK!)</span>";
+        if (game.isGameOver()) statusEl.innerHTML = "<span class='text-danger'>GAME OVER</span>";
+    }
+
+    // --- FUNGSI RENDER TABEL MOVE LIST ---
+    function renderMoveListTable() {
+        const tbody = document.getElementById("moveTableBody");
+        if (!tbody) return;
+        tbody.innerHTML = "";
+        
+        const moves = game.history({ verbose: true });
+        for (let i = 0; i < moves.length; i += 2) {
+            const white = moves[i];
+            const black = moves[i + 1];
+            const num = Math.floor(i / 2) + 1;
+
+            const row = document.createElement("tr");
+            
+            const numTd = document.createElement("td");
+            numTd.className = "text-white-50 small border-secondary";
+            numTd.textContent = num;
+            row.appendChild(numTd);
+
+            // Logic Warna Move List
+            // Kalau langkah ini SAMA dengan Main Line -> Warna Normal
+            // Kalau BEDA (Variasi) -> Warna Biru/Tanda Khusus
+            
+            const wTd = document.createElement("td");
+            wTd.textContent = white.san;
+            wTd.className = "cursor-pointer border-secondary text-white py-2";
+            // Cek apakah langkah ini menyimpang?
+            if (mainLineMoves[i] !== white.san) wTd.classList.add("text-info", "fw-bold"); 
+            wTd.onclick = () => jumpTo(i);
+            row.appendChild(wTd);
+
+            const bTd = document.createElement("td");
+            bTd.className = "border-secondary text-white py-2";
+            if (black) {
+                bTd.textContent = black.san;
+                bTd.classList.add("cursor-pointer");
+                if (mainLineMoves[i+1] !== black.san) bTd.classList.add("text-info", "fw-bold");
+                bTd.onclick = () => jumpTo(i+1);
+            }
+            row.appendChild(bTd);
+            tbody.appendChild(row);
+        }
+        // Auto scroll
+        if (tbody.lastChild) tbody.lastChild.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    // Fungsi Jump sederhana (Replay dari awal sampai target)
+    function jumpTo(targetIdx) {
+        // Karena history di chess.js itu read-only, cara paling aman loncat adalah:
+        // Reset -> Mainkan ulang history yang ada di tabel sampai index target
+        const targetHistory = game.history(); 
+        game.reset();
+        for (let i = 0; i <= targetIdx; i++) {
+            game.move(targetHistory[i]);
+        }
+        updateBoardAndAI();
+    }
+
+    window.playMainMove = (san) => {
+        game.move(san);
+        redoStack = []; // Reset redo karena kita mengikuti jalur utama manual
+        updateBoardAndAI();
+    }
+
+    // --- NAVIGASI TOMBOL ---
+    document.getElementById("btnPrev").addEventListener("click", () => {
+        const move = game.undo();
+        if (move) { redoStack.push(move); updateBoardAndAI(); }
+    });
+
+    document.getElementById("btnNext").addEventListener("click", () => {
+        // Prioritas 1: Ambil dari Redo Stack (kalau user habis undo)
+        if (redoStack.length > 0) {
+            game.move(redoStack.pop());
+            updateBoardAndAI();
+            return;
+        }
+
+        // Prioritas 2: Kalau Redo kosong, tapi kita di Main Line, ambil dari Main Line!
+        if (isMainLine) {
+            const nextMoveIndex = game.history().length;
+            if (nextMoveIndex < mainLineMoves.length) {
+                game.move(mainLineMoves[nextMoveIndex]);
+                updateBoardAndAI();
+            }
+        }
+    });
+
+    document.getElementById("btnStart").addEventListener("click", () => {
+        while (game.undo()) { /* Undo all */ }
+        redoStack = []; // Reset redo
+        updateBoardAndAI();
+    });
+
+    document.getElementById("btnEnd").addEventListener("click", () => {
+        // Maju mentok ke akhir MAIN LINE (bukan variasi)
+        if (mainLineMoves.length > 0) {
+            game.reset();
+            mainLineMoves.forEach(m => game.move(m));
+            redoStack = [];
+            updateBoardAndAI();
+        }
+    });
+
+    document.getElementById("flipBtn").addEventListener("click", () => {
+        board.setOrientation(board.getOrientation() === 'w' ? 'b' : 'w');
+    });
+
+    // --- STOCKFISH RESPONSE ---
+    stockfish.onmessage = function(event) {
+        const line = event.data;
+        if (line.startsWith('bestmove')) {
+            const bestMove = line.split(' ')[1];
+            if (bestMove) {
+                const from = bestMove.substring(0, 2);
+                const to = bestMove.substring(2, 4);
+                try { board.addArrow(ARROW_TYPE.success || {class: "arrow-success"}, from, to); } catch(e){}
+            }
+        }
+        if (line.includes('score cp')) {
+            const match = line.match(/score cp (-?\d+)/);
+            if (match) {
+                let score = parseInt(match[1]);
+                if (game.turn() === 'b') score = -score;
+                document.getElementById("evalScore").textContent = `Eval: ${(score/100).toFixed(2)}`;
+                let percent = 50 + (score / 10);
+                if (percent > 100) percent = 100; if (percent < 0) percent = 0;
+                document.getElementById("evalBar").style.width = percent + "%";
+            }
+        }
+    };
+
+    // --- DRAG & DROP ---
+    board.enableMoveInput((event) => {
+        switch (event.type) {
+            case INPUT_EVENT_TYPE.moveInputStarted:
+                if (game.turn() === event.piece[0]) return true; 
+                return false; 
+
+            case INPUT_EVENT_TYPE.validateMoveInput:
+                const piece = game.get(event.squareFrom);
+                // Promosi
+                if (piece && piece.type === 'p' && 
+                   ((piece.color === 'w' && event.squareTo[1] === '8') || 
+                    (piece.color === 'b' && event.squareTo[1] === '1'))) {
+                    
+                    board.showPromotionDialog(event.squareTo, piece.color === 'w' ? COLOR.white : COLOR.black, (result) => {
+                        if (result && result.piece) {
+                            const move = game.move({ from: event.squareFrom, to: event.squareTo, promotion: result.piece[1] });
+                            if (move) { 
+                                redoStack = []; // CABANG BARU -> Hapus masa depan
+                                updateBoardAndAI(); 
+                            } else board.setPosition(game.fen(), true);
+                        } else board.setPosition(game.fen(), true);
+                    });
+                    return false;
+                }
+                // Normal
+                try {
+                    const move = game.move({ from: event.squareFrom, to: event.squareTo });
+                    if (move) {
+                        redoStack = []; // CABANG BARU -> Hapus masa depan
+                        updateBoardAndAI();
+                        return true; 
+                    }
+                } catch (e) {}
+                return false; 
+        }
+    });
+
+    // START
+    stockfish.postMessage('uci');
+    updateBoardAndAI();
+</script>
+
+{% endblock %}

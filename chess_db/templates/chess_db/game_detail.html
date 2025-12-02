@@ -4,11 +4,12 @@
 {% block title %}{{ game.white_player }} vs {{ game.black_player }}{% endblock %}
 
 {% block content %}
+
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h2 class="fw-bold m-0 text-white">
     <span class="text-primary">{{ game.white_player }}</span> vs <span class="text-danger">{{ game.black_player }}</span>
   </h2>
-  <a href="{% url 'game_edit' game.id %}" class="btn btn-outline-light btn-sm">Edit Info Game</a>
+  <a href="{% url 'game_edit' game.id %}" class="btn btn-outline-light btn-sm">✏️ Edit Info Game</a>
 </div>
 
 <div class="card mb-4 shadow-sm border-secondary" style="background-color: var(--bg-card);">
@@ -22,12 +23,12 @@
       <div class="col-md-4">
         <p class="mb-1 text-info small fw-bold text-uppercase">Result & Opening</p>
         <div class="text-white fw-bold">{{ game.result|default:"-" }}</div>
-        <div class="text-white-50">{{ game.opening|default:"" }} <span class="badge bg-secondary">{{ game.eco_code|default:"" }}</span></div>
+        <div class="text-white-50">{{ game.opening|default:"-" }} <span class="badge bg-secondary">{{ game.eco_code|default:"" }}</span></div>
       </div>
       <div class="col-md-4">
         <p class="mb-1 text-info small fw-bold text-uppercase">Ratings & Tags</p>
         <div class="text-white">⚪ {{ game.white_elo|default:"?" }} / ⚫ {{ game.black_elo|default:"?" }}</div>
-        <div class="mt-1">{% if game.tags %}<span class="badge bg-primary text-dark">{{ game.tags }}</span>{% else %}<span class="text-white-50 small">No Tags</span>{% endif %}</div>
+        <div class="mt-1">{% if game.tags %}<span class="badge bg-primary text-dark">{{ game.tags }}</span>{% else %}<span class="text-white-50 small">- No Tags -</span>{% endif %}</div>
       </div>
     </div>
   </div>
@@ -35,7 +36,6 @@
 
 <div class="row g-4">
   <div class="col-lg-7 col-xl-6">
-    
     <link rel="stylesheet" href="{% static 'assets/chessboard.css' %}" />
     <link rel="stylesheet" href="{% static 'assets/extensions/markers/markers.css' %}" />
 
@@ -45,31 +45,39 @@
       </div>
     </div>
 
-    <div class="mt-3 d-flex align-items-center justify-content-between bg-secondary bg-opacity-10 p-3 rounded border border-secondary">
+    <div class="mt-3 d-flex align-items-center justify-content-center bg-secondary bg-opacity-10 p-3 rounded border border-secondary">
       <div class="btn-group">
         <button id="prevBtn" class="btn btn-outline-light">◀ Prev</button>
         <button id="playBtn" class="btn btn-outline-primary">Play</button>
         <button id="nextBtn" class="btn btn-outline-light">Next ▶</button>
       </div>
-      <div class="form-check form-switch ms-3">
-        <input class="form-check-input" type="checkbox" id="draggableToggle">
-        <label class="form-check-label small text-white" for="draggableToggle">Move Pieces</label>
-      </div>
+      
+      <a href="#" id="analysisLink" 
+         data-url="{% url 'analysis_board' %}" 
+         data-game-id="{{ game.id }}"
+         class="btn btn-info btn-sm ms-3 text-dark fw-bold">
+        🧪 Analysis Board
+      </a>
     </div>
+
     <div class="mt-2 px-2">
       <input id="moveRange" type="range" class="form-range" min="0" max="0" value="0">
       <div class="text-center small text-white-50">
         Move: <span id="moveIndex" class="fw-bold text-white">0</span> / <span id="moveCount">0</span>
       </div>
     </div>
+    
+    <div class="mt-3 text-center">
+        <button id="searchFenBtn" class="btn btn-outline-secondary btn-sm">🔍 Cari Posisi Ini</button>
+    </div>
 
     {% if game.notes %}
     <div class="card mt-4 border-warning bg-transparent">
-      <div class="card-header bg-warning bg-opacity-10 text-warning fw-bold border-warning">Notes</div>
+      <div class="card-header bg-warning bg-opacity-10 text-warning fw-bold border-warning">📝 Catatan Pribadi</div>
       <div class="card-body">
         <form method="post">{% csrf_token %}
             <div class="mb-2"><textarea name="notes" class="form-control bg-dark text-white border-secondary" rows="4">{{ game.notes|default:"" }}</textarea></div>
-            <div class="text-end"><button type="submit" class="btn btn-warning btn-sm fw-bold text-dark">Save</button></div>
+            <div class="text-end"><button type="submit" class="btn btn-warning btn-sm fw-bold text-dark">💾 Simpan</button></div>
         </form>
       </div>
     </div>
@@ -78,7 +86,7 @@
 
   <div class="col-lg-5 col-xl-6">
     <div class="card shadow-sm bg-dark border-secondary mb-3">
-        <div class="card-header bg-secondary bg-opacity-25 text-white border-secondary py-2"><small class="fw-bold">MOVE LIST</small></div>
+        <div class="card-header bg-secondary bg-opacity-25 text-white border-secondary py-2"><small class="fw-bold">📋 MOVE LIST</small></div>
         <div class="card-body p-0" style="height: 400px; overflow-y: auto;">
             <table class="table table-dark table-striped table-hover table-sm mb-0 text-center" style="font-family: 'JetBrains Mono', monospace;">
                 <thead class="sticky-top bg-secondary"><tr><th class="text-white-50" style="width: 15%;">#</th><th style="width: 42.5%;">White</th><th style="width: 42.5%;">Black</th></tr></thead>
@@ -113,7 +121,10 @@
     const moveDataList = JSON.parse(document.getElementById("move-data").textContent) || [];
     const validMoveData = (Array.isArray(moveDataList) && moveDataList.length) ? moveDataList : [{ fen: "start", notation: "Start", move_number: "", from: null, to: null }];
     const container = document.getElementById("board");
-
+    const analysisLink = document.getElementById("analysisLink");
+    const analysisBaseUrl = analysisLink ? analysisLink.getAttribute("data-url") : "";
+    const gameId = analysisLink ? analysisLink.getAttribute("data-game-id") : "";
+    
     const board = new Chessboard(container, {
         position: validMoveData[0].fen,
         assetsUrl: "{% static 'assets/' %}", 
@@ -121,15 +132,9 @@
             cssClass: "green",
             pieces: { file: "pieces/standard.svg" } 
         },
-    
-        extensions: [{
-            class: Markers,
-            props: {
-                    sprite: "extensions/markers/markers.svg" 
-                } 
-              }
-        ],
-        responsive: true
+        extensions: [{class: Markers}],
+        responsive: true,
+        draggable: false 
     });
 
     const prevBtn = document.getElementById("prevBtn");
@@ -138,8 +143,8 @@
     const moveIndexEl = document.getElementById("moveIndex");
     const moveCountEl = document.getElementById("moveCount");
     const moveRange = document.getElementById("moveRange");
-    const draggableToggle = document.getElementById("draggableToggle");
-
+    const searchFenBtn = document.getElementById("searchFenBtn");
+    
     let idx = 0;
     const maxMoves = Math.max(0, validMoveData.length - 1);
     moveCountEl.textContent = maxMoves;
@@ -152,16 +157,19 @@
             const whiteMove = validMoveData[i];
             const blackMove = validMoveData[i + 1]; 
             const row = document.createElement("tr");
+            
             const numCell = document.createElement("td");
             numCell.className = "text-white-50 border-secondary small align-middle";
             numCell.textContent = whiteMove.move_number.replace('.', ''); 
             row.appendChild(numCell);
+
             const whiteCell = document.createElement("td");
             whiteCell.textContent = whiteMove.notation;
             whiteCell.id = "move-" + i;
             whiteCell.className = "move-item cursor-pointer border-secondary text-white py-2";
             whiteCell.onclick = () => setIndex(i);
             row.appendChild(whiteCell);
+
             const blackCell = document.createElement("td");
             blackCell.className = "border-secondary text-white py-2";
             if (blackMove) {
@@ -179,33 +187,31 @@
         idx = Math.max(0, Math.min(i, maxMoves));
         
         if (validMoveData[idx]) {
-        board.setPosition(validMoveData[idx].fen, true);
+            const currentFen = validMoveData[idx].fen;
 
-        const move = validMoveData[idx];
-        
-        if (board.removeMarkers) {
-            board.removeMarkers(); 
+            // A. Update Papan
+            board.setPosition(currentFen, true);
             
-            if (move.from && move.to) {
-                let markerToUse = MARKER_SQUARE; // Default Kuning
+            // B. UPDATE LINK ANALYSIS (INI PERBAIKANNYA!)
+            // Setiap kali papan berubah, kita update href tombolnya
+            // URL: /chess/analysis/?game_id=1&fen=rnbq...
+            const fenForUrl = encodeURIComponent(currentFen);
+            analysisLink.href = `${analysisBaseUrl}?game_id=${gameId}&fen=${fenForUrl}`;
 
-                // Cek Notasi: Apakah mengandung tanda '+' (Skak)?
-                // move.notation bisa string "Nf3+" atau "Qxe4+"
-                if (move.notation && move.notation.includes("+")) {
-                    markerToUse = MARKER_CHECK; // Ganti jadi Merah
+            // C. Update Marker
+            const move = validMoveData[idx];
+            if (board.removeMarkers) {
+                board.removeMarkers(); 
+                if (move.from && move.to) {
+                    let markerToUse = MARKER_SQUARE;
+                    if (move.notation && (move.notation.includes("+") || move.notation.includes("#"))) {
+                        markerToUse = MARKER_CHECK;
+                    }
+                    board.addMarker(markerToUse, move.from);
+                    board.addMarker(markerToUse, move.to);
                 }
-                
-                // Bisa juga tambah logika untuk Skakmat (#)
-                if (move.notation && move.notation.includes("#")) {
-                    markerToUse = MARKER_CHECK; 
-                }
-
-                // Pasang marker yang sudah dipilih
-                board.addMarker(markerToUse, move.from);
-                board.addMarker(markerToUse, move.to);
             }
         }
-    }
         
         moveIndexEl.textContent = idx;
         moveRange.value = idx;
@@ -215,14 +221,16 @@
     function highlightActiveMove() {
         const allMoves = document.querySelectorAll(".move-item");
         allMoves.forEach(el => {
-            el.style.backgroundColor = "transparent";
+            el.style.backgroundColor = "";
             el.classList.remove("fw-bold", "text-dark", "bg-warning");
             el.classList.add("text-white");
         });
         const activeMove = document.getElementById("move-" + idx);
         if (activeMove) {
             activeMove.classList.remove("text-white");
-            activeMove.classList.add("bg-warning", "text-dark", "fw-bold");
+            activeMove.style.backgroundColor = "#ffc107"; 
+            activeMove.style.color = "#000";
+            activeMove.style.fontWeight = "bold";
             activeMove.scrollIntoView({ behavior: "smooth", block: "nearest" });
         }
     }
@@ -230,7 +238,7 @@
     prevBtn.addEventListener("click", () => setIndex(idx - 1));
     nextBtn.addEventListener("click", () => setIndex(idx + 1));
     moveRange.addEventListener("input", (e) => setIndex(parseInt(e.target.value, 10)));
-
+    
     let playInterval = null;
     playBtn.addEventListener("click", () => {
         if (playInterval) {
@@ -239,7 +247,6 @@
             playBtn.textContent = "▶ Play";
             playBtn.classList.replace("btn-danger", "btn-outline-primary");
         } else {
-            if (draggableToggle.checked) draggableToggle.click();
             playBtn.textContent = "⏸ Pause";
             playBtn.classList.replace("btn-outline-primary", "btn-danger");
             playInterval = setInterval(() => {
@@ -254,14 +261,19 @@
         }
     });
 
-    draggableToggle.addEventListener("change", (ev) => {
-        if (ev.target.checked) {
-            alert("Fitur geser sementara dimatikan.");
-            ev.target.checked = false;
-        } 
+    searchFenBtn.addEventListener("click", () => {
+        let currentFen = "";
+        if (validMoveData[idx]) {
+            currentFen = validMoveData[idx].fen;
+        } else {
+            currentFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        }
+        const fenPositionOnly = currentFen.split(" ")[0];
+        window.location.href = "{% url 'game_list' %}?fen=" + encodeURIComponent(fenPositionOnly);
     });
 
     renderMoveList();
     setIndex(0);
+
 </script>
 {% endblock %}

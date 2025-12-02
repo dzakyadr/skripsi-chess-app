@@ -17,4 +17,8 @@ urlpatterns = [
     
     path('explorer/', views.opening_explorer, name='opening_explorer'),
     
+    path('analysis/', views.analysis_board, name='analysis_board'),
+    
+    path('api/opening-stats/', views.api_opening_stats, name='api_opening_stats'),
 ]
+    

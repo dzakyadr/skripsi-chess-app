@@ -1,8 +1,8 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from .forms import UploadPgnForm, GameEditForm, GameNotesForm
-from .models import Game
 import chess.pgn
+from collections import Counter
 import io
 from datetime import datetime
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
@@ -10,7 +10,9 @@ from django.db.models import Q
 from django.views.decorators.http import require_POST
 from collections import defaultdict
 import chess
-
+from django.http import JsonResponse
+from .models import Game, PlayerProfile, PlayerAlias
+from .eco_data import get_opening_name 
 
 def upload_pgn(request):
     if request.method == 'POST':
@@ -95,57 +97,110 @@ def upload_pgn(request):
         form = UploadPgnForm()
     return render(request, 'chess_db/upload_pgn.html', {'form': form})
 
-# --- Fungsi ini sudah bagus, tidak perlu diubah ---
-
-
 def game_list(request):
-    # Ambil semua game
     qs = Game.objects.all()
 
-    # ---------------------------------------------------------
-    # 1) Search (Pencarian) - BAGIAN INI TETAP SAMA
-    # ---------------------------------------------------------
+    # --- 1. SEARCH BY FEN (LOGIKA BARU) ---
+    # Ini untuk menangkap request dari Opening Explorer / Analysis Board
+    fen_query = request.GET.get('fen', '').strip()
+    
+    if fen_query and fen_query != 'start':
+        # Kita harus mencari game yang pernah melewati posisi ini.
+        # Karena database kita menyimpan PGN (bukan FEN per langkah), kita harus scan manual.
+        # (Catatan: Ini mungkin agak lambat jika databasenya ribuan, tapi ini solusi terbaik tanpa ubah model)
+        
+        matching_ids = []
+        # Ambil bagian posisi bidak saja (sebelum spasi pertama) agar pencarian fleksibel
+        target_board_fen = fen_query.split(' ')[0] 
+        
+        board = chess.Board()
+
+        # Optimasi: Batasi pencarian ke 1000 game terbaru dulu supaya tidak loading lama
+        # Kalau mau cari semua, hapus [:1000]
+        games_to_scan = qs.order_by('-game_date')[:1000] 
+
+        for game in games_to_scan:
+            try:
+                pgn_io = io.StringIO(game.pgn)
+                game_obj = chess.pgn.read_game(pgn_io)
+                
+                if game_obj:
+                    board.reset()
+                    # Cek posisi awal
+                    if board.fen().split(' ')[0] == target_board_fen:
+                        matching_ids.append(game.id)
+                        continue
+
+                    # Cek setiap langkah dalam game
+                    for move in game_obj.mainline_moves():
+                        board.push(move)
+                        if board.fen().split(' ')[0] == target_board_fen:
+                            matching_ids.append(game.id)
+                            break # Ketemu! Lanjut ke game berikutnya
+            except:
+                continue
+        
+        # Filter QuerySet agar HANYA menampilkan game yang cocok
+        qs = qs.filter(id__in=matching_ids)
+
+    # --- 2. SEARCH BIASA (Nama, Event, dll) ---
     q = request.GET.get('q', '').strip()
     if q:
-        qs = qs.filter(
-            Q(white_player__icontains=q) |
-            Q(black_player__icontains=q) |
-            Q(event__icontains=q) |
-            Q(opening__icontains=q)
-        )
+        # A. Cek apakah 'q' cocok dengan Profil/Alias di database?
+        profiles = PlayerProfile.objects.filter(
+            Q(name__icontains=q) | 
+            Q(aliases__username__icontains=q)
+        ).distinct()
 
-    # ---------------------------------------------------------
-    # 2) Sorting (Pengurutan) - BAGIAN INI KITA UBAH TOTAL
-    # ---------------------------------------------------------
-    # Kita tidak lagi pakai 'order' (asc/desc) terpisah.
-    # Kita gabungkan logikanya dalam satu kamus (dictionary).
-    
-    sort_param = request.GET.get('sort', 'newest') # Default: 'newest'
+        # B. Kumpulkan semua nama target
+        target_names = set()
+        
+        if profiles.exists():
+            # Kalau ketemu profil resmi, ambil SEMUA nama panggilannya
+            for prof in profiles:
+                target_names.add(prof.name)
+                for alias in prof.aliases.all():
+                    target_names.add(alias.username)
+        else:
+            # Kalau tidak ada profil, cari teks apa adanya
+            target_names.add(q)
+        
+        # C. Susun Query Database
+        # Kita mencari game yang:
+        # 1. Pemainnya ada di daftar 'target_names' (Smart Search)
+        # 2. ATAU Event/Opening mengandung teks 'q' (Search Biasa)
+        
+        search_query = Q()
+        
+        # Filter Pemain (Cerdas)
+        for name in target_names:
+            search_query |= Q(white_player__icontains=name) | Q(black_player__icontains=name)
+            
+        # Filter Metadata lain (Event/Opening) - Tetap pakai teks asli user 'q'
+        search_query |= Q(event__icontains=q) | Q(opening__icontains=q)
+        
+        # Terapkan filter
+        qs = qs.filter(search_query)
 
+    # --- 3. SORTING ---
+    sort_param = request.GET.get('sort', 'newest')
     sort_options = {
-        'newest': '-game_date',      # Terbaru (Tanggal Descending)
-        'oldest': 'game_date',       # Terlama (Tanggal Ascending)
-        'white_az': 'white_player',  # Putih A-Z
-        'white_za': '-white_player', # Putih Z-A
-        'black_az': 'black_player',  # Hitam A-Z
-        'black_za': '-black_player', # Hitam Z-A
-        'event_az': 'event',         # Event A-Z
-        'id': '-id',                 # ID (Default fallback)
+        'newest': '-game_date',
+        'oldest': 'game_date',
+        'white_az': 'white_player',
+        'white_za': '-white_player',
+        'black_az': 'black_player',
+        'black_za': '-black_player',
+        'event_az': 'event',
+        'id': '-id',
     }
-
-    # Ambil nama kolom dari kamus. Jika tidak ketemu, pakai '-game_date'
     order_by_field = sort_options.get(sort_param, '-game_date')
-    
-    # Terapkan pengurutan
     qs = qs.order_by(order_by_field)
 
-    # ---------------------------------------------------------
-    # 3) Pagination (Halaman) - BAGIAN INI TETAP SAMA
-    # ---------------------------------------------------------
+    # --- 4. PAGINATION ---
     try:
         per_page = int(request.GET.get('per_page', 10))
-        if per_page <= 0 or per_page > 200:
-            per_page = 10
+        if per_page <= 0 or per_page > 200: per_page = 10
     except (ValueError, TypeError):
         per_page = 10
 
@@ -159,29 +214,51 @@ def game_list(request):
     except EmptyPage:
         games_page = paginator.page(paginator.num_pages)
 
-    # 4) Offset untuk nomor urut global
+    # Hitung offset untuk penomoran tabel
     try:
         current_page_number = int(games_page.number)
-    except Exception:
+    except:
         current_page_number = 1
     offset = (current_page_number - 1) * per_page
 
-    # ---------------------------------------------------------
-    # 5) Context - KITA UPDATE SEDIKIT
-    # ---------------------------------------------------------
     context = {
         'games': games_page,
         'q': q,
-        'sort': sort_param,  # Kita kirim nilai sort (misal: 'newest', 'white_az')
-        # 'order': order,    <-- HAPUS INI (Sudah tidak dipakai)
+        'sort': sort_param,
         'per_page': per_page,
         'paginator': paginator,
         'offset': offset,
+        'fen_query': fen_query, # Kirim data FEN ke template (untuk info alert)
     }
     
     return render(request, 'chess_db/game_list.html', context)
 
 
+def analysis_board(request):
+    # 1. Cek parameter di URL
+    game_id = request.GET.get('game_id')
+    fen_input = request.GET.get('fen')
+    
+    initial_pgn = None
+    initial_fen = None
+
+    # 2. Logika Pengambilan Data
+    if game_id:
+        # Hanya ambil PGN jika ada ID valid
+        game_obj = get_object_or_404(Game, pk=game_id)
+        initial_pgn = game_obj.pgn
+    elif fen_input:
+        # Hanya ambil FEN jika ada parameter fen
+        initial_fen = fen_input
+    
+    # Jika tidak ada game_id dan tidak ada fen,
+    # maka initial_pgn dan initial_fen AKAN TETAP None (Kosong).
+    
+    context = {
+        'initial_pgn': initial_pgn,
+        'initial_fen': initial_fen
+    }
+    return render(request, 'chess_db/analysis_board.html', context)
 
 def game_detail(request, game_id):
     game = get_object_or_404(Game, pk=game_id)
@@ -283,51 +360,239 @@ def game_delete(request, game_id):
 
     return redirect('game_list')
 def opening_explorer(request):
-    all_games = Game.objects.all()
-    move_stats = defaultdict(lambda: {
-        'total': 0, 'wins': 0, 'draws': 0, 'losses': 0
-    })
-
-    board = chess.Board() 
-
-    for game in all_games:
-        pgn_io = io.StringIO(game.pgn)
+    # 1. Parameter Filter
+    opponent_name = request.GET.get('opponent', '').strip()
+    user_color = request.GET.get('color', '') 
+    current_fen = request.GET.get('fen', 'start')
+    
+    # 2. Setup Board
+    board = chess.Board()
+    if current_fen != 'start':
         try:
-            game_obj = chess.pgn.read_game(pgn_io)
-            if not game_obj:
-                continue
-            # Cara baru yang lebih aman:
-            moves = list(game_obj.mainline_moves())
-            if not moves:
-                continue 
-            first_move = moves[0]
+            board.set_fen(current_fen)
+        except ValueError:
+            board.reset()
 
-            if first_move:
-                move_san = board.san(first_move)
-                stats = move_stats[move_san]
-                stats['total'] += 1
+    # Info Giliran
+    turn_color = 'white' if board.turn == chess.WHITE else 'black'
+    move_number = board.fullmove_number
 
-                if game.result == '1-0':
-                    stats['wins'] += 1
-                elif game.result == '0-1':
-                    stats['losses'] += 1
-                elif game.result == '1/2-1/2':
-                    stats['draws'] += 1
-        except Exception as e:
-            print(f"Skipping game {game.id} due to parsing error: {e}")
+    # 3. Filter Database (Sama seperti sebelumnya)
+    hero_name = "You"
+    villain_name = opponent_name if opponent_name else "Global Stats"
+    scenario_text = ""
+    is_opponent_turn = False
 
-    stats_list = []
-    for move_san, data in move_stats.items():
-        stats_list.append({
-            'move': move_san,
-            'total': data['total'],
-            'wins': data['wins'],
-            'draws': data['draws'],
-            'losses': data['losses'],
-        })
+    if opponent_name:
+        if user_color == 'white':
+            games = Game.objects.filter(black_player__icontains=opponent_name)
+            scenario_text = f"Giliranmu (Putih) vs {opponent_name}." if turn_color == 'white' else f"Giliran {opponent_name} (Hitam)."
+            is_opponent_turn = (turn_color == 'black')
+        elif user_color == 'black':
+            games = Game.objects.filter(white_player__icontains=opponent_name)
+            scenario_text = f"Giliran {opponent_name} (Putih)." if turn_color == 'white' else f"Giliranmu (Hitam) vs {opponent_name}."
+            is_opponent_turn = (turn_color == 'white')
+        else:
+            games = Game.objects.filter(Q(white_player__icontains=opponent_name) | Q(black_player__icontains=opponent_name))
+            scenario_text = f"Statistik umum {opponent_name}."
+            is_opponent_turn = True 
+    else:
+        games = Game.objects.all()
+        scenario_text = f"Statistik Global Database."
+        is_opponent_turn = False
+
+    # 4. Hitung Statistik & CARI GAME TERKAIT (Update di sini)
+    target_games = games.order_by('-game_date')[:500] # Batasi 500 game terbaru biar cepat
+    
+    stats_data = {} 
+    matching_games = [] # <-- LIST BARU UNTUK MENYIMPAN GAME
+    
+    root_fen_base = board.fen().split(' ')[0]
+
+    for game in target_games:
+        try:
+            pgn_io = io.StringIO(game.pgn)
+            chess_game = chess.pgn.read_game(pgn_io)
+            if not chess_game: continue
+            
+            game_board = chess_game.board()
+            found_position = False # Penanda apakah game ini melewati posisi tersebut
+            next_move = None
+            
+            if current_fen == 'start':
+                found_position = True
+                moves = list(chess_game.mainline_moves())
+                if moves: next_move = moves[0]
+            else:
+                # Replay
+                for move in chess_game.mainline_moves():
+                    if game_board.fen().split(' ')[0] == root_fen_base:
+                        found_position = True
+                        next_move = move
+                        break
+                    game_board.push(move)
+            
+            # JIKA POSISI COCOK:
+            if found_position:
+                # A. Masukkan ke daftar 'Matching Games' (Batasi 10 saja biar UI gak penuh)
+                #if len(matching_games) < 10:
+                 #   matching_games.append(game)
+
+                # B. Hitung Statistik Langkah Selanjutnya
+                if next_move:
+                    move_san = game_board.san(next_move)
+                    result = game.result
+                    
+                    if move_san not in stats_data:
+                        stats_data[move_san] = {'move': move_san, 'total': 0, 'wins': 0, 'draws': 0, 'losses': 0}
+                    
+                    stats_data[move_san]['total'] += 1
+                    if result == '1-0': stats_data[move_san]['wins'] += 1
+                    elif result == '0-1': stats_data[move_san]['losses'] += 1
+                    else: stats_data[move_san]['draws'] += 1
+                    
+        except Exception:
+            continue
+            
+    stats_list = sorted(stats_data.values(), key=lambda x: x['total'], reverse=True)
 
     context = {
-        'stats_list': stats_list
+        'stats_list': stats_list,
+        'scenario_text': scenario_text,
+        'opponent_name': opponent_name,
+        'is_opponent_turn': is_opponent_turn,
+        'move_number': move_number,
+        'turn_color': turn_color.capitalize()
     }
-
     return render(request, 'chess_db/opening_explorer.html', context)
+
+def api_opening_stats(request):
+    """
+    API Opening Explorer dengan Fitur SMART ALIASING.
+    """
+    fen = request.GET.get('fen', 'start')
+    opponent = request.GET.get('opponent', '').strip()
+    user_color = request.GET.get('color', '')
+
+    # 1. Setup Papan
+    board = chess.Board()
+    if fen != 'start':
+        try:
+            board.set_fen(fen)
+        except ValueError:
+            return JsonResponse({'error': 'Invalid FEN'}, status=400)
+    
+    root_fen_base = board.fen().split(' ')[0]
+    
+    eco_code, opening_name = get_opening_name(board.fen())
+    
+    if not opening_name:
+        opening_name = "Unknown Opening"
+        eco_code = "-"
+
+    # 2. FILTER GAME (BAGIAN INI KITA UPDATE JADI PINTAR)
+    games = Game.objects.all()
+
+    if opponent:
+        # --- LOGIKA PENYATUAN AKUN (ALIASING) ---
+        # Langkah A: Cari apakah nama yang diketik user ada di tabel Profil/Alias?
+        # Kita cari Profil yang namanya mirip ATAU punya alias yang mirip input user
+        profiles = PlayerProfile.objects.filter(
+            Q(name__icontains=opponent) | 
+            Q(aliases__username__icontains=opponent)
+        ).distinct()
+
+        # Langkah B: Kumpulkan semua nama panggilan (Username) yang mungkin
+        target_names = set() # Pakai set biar tidak ada nama dobel
+        
+        if profiles.exists():
+            # Kalau ketemu Profil resmi, ambil semua alias-nya
+            for prof in profiles:
+                target_names.add(prof.name) # Masukkan nama asli (misal "Dzaky Adrian")
+                for alias in prof.aliases.all():
+                    target_names.add(alias.username) # Masukkan semua alias (vestnik713, dzakuy)
+        else:
+            # Kalau tidak ketemu di database alias, ya cari nama itu aja apa adanya
+            target_names.add(opponent)
+        
+        # Langkah C: Bikin Query Database Game
+        # Kita akan cari game dimana nama pemainnya COCOK dengan SALAH SATU dari target_names
+        # Contoh Query: (White="vestnik713") OR (White="dzakuy") ...
+        
+        query_player = Q()
+        for name in target_names:
+            if user_color == 'white':
+                # Kita Putih, Cari Lawan (Hitam) yang namanya ada di daftar
+                query_player |= Q(black_player__icontains=name)
+            elif user_color == 'black':
+                # Kita Hitam, Cari Lawan (Putih) yang namanya ada di daftar
+                query_player |= Q(white_player__icontains=name)
+            else:
+                # Cari di kedua sisi
+                query_player |= Q(white_player__icontains=name) | Q(black_player__icontains=name)
+        
+        # Terapkan filter pintar ini
+        games = games.filter(query_player)
+
+    # 3. Hitung Statistik (Sama seperti sebelumnya, tidak berubah)
+    target_games = games.order_by('-game_date')[:1000]
+    stats_data = {}
+    
+    for game in target_games:
+        try:
+            # Optimasi: Cek string PGN dulu
+            #if root_fen_base not in game.pgn and fen != 'start': 
+             #   continue 
+
+            pgn_io = io.StringIO(game.pgn)
+            chess_game = chess.pgn.read_game(pgn_io)
+            if not chess_game: continue
+
+            game_board = chess_game.board()
+            next_move = None
+            
+            if fen == 'start':
+                moves = list(chess_game.mainline_moves())
+                if moves: next_move = moves[0]
+            else:
+                match = False
+                for move in chess_game.mainline_moves():
+                    if game_board.fen().split(' ')[0] == root_fen_base:
+                        match = True
+                        next_move = move
+                        break
+                    game_board.push(move)
+                if not match: continue
+
+            if next_move:
+                move_san = game_board.san(next_move)
+                result = game.result
+                
+                if move_san not in stats_data:
+                    stats_data[move_san] = {'move': move_san, 'total': 0, 'wins': 0, 'draws': 0, 'losses': 0}
+                
+                stats_data[move_san]['total'] += 1
+                if result == '1-0': stats_data[move_san]['wins'] += 1
+                elif result == '0-1': stats_data[move_san]['losses'] += 1
+                else: stats_data[move_san]['draws'] += 1
+
+        except Exception:
+            continue
+
+    stats_list = sorted(stats_data.values(), key=lambda x: x['total'], reverse=True)
+    
+    
+    # Kirim juga info nama siapa saja yang dicari (untuk debug/info)
+    debug_names = list(target_names) if opponent else []
+    
+    current_board_fen = board.fen() 
+    
+    # Panggil fungsi debug tadi
+    eco_code, opening_name = get_opening_name(current_board_fen)
+    # ...
+    
+    return JsonResponse({
+        'stats': stats_list,
+        'searched_aliases': list(target_names) if opponent else [], # (Kalau kamu pakai logika alias)
+        'opening': {'code': eco_code, 'name': opening_name} # <-- KIRIM DATA INI
+    })

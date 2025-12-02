@@ -8,79 +8,130 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h2 class="fw-bold m-0 text-white">Opening Explorer</h2>
-        <p class="text-white-50 mb-0">Statistik langkah pertama dari seluruh database Anda.</p>
+        <p class="text-white-50 mb-0">Persiapan lawan & statistik pembukaan.</p>
     </div>
+    <a href="{% url 'opening_explorer' %}" class="btn btn-outline-light btn-sm">Reset Filter</a>
 </div>
+
+
 
 <div class="row g-4">
     
     <div class="col-lg-5">
-        <div class="card shadow-sm border-0 bg-dark">
-            <div class="card-header bg-secondary bg-opacity-10 border-secondary text-white">
-                <small class="fw-bold">CURRENT POSITION</small>
-            </div>
+        <div class="card shadow-sm border-0 bg-dark mb-3">
             <div class="card-body p-2 d-flex justify-content-center">
                 <link rel="stylesheet" href="{% static 'assets/chessboard.css' %}"/>
+                <link rel="stylesheet" href="{% static 'assets/extensions/markers/markers.css' %}" />
                 <div id="board" style="width: 100%; max-width: 500px; aspect-ratio: 1/1;"></div>
             </div>
+        </div>
+
+        <div class="d-flex justify-content-center gap-2 mt-2 bg-dark p-2 rounded border border-secondary">
+            <button id="btnStart" class="btn btn-secondary btn-sm px-3" title="Reset ke Awal">|&lt;&lt;</button>
+            <button id="btnPrev" class="btn btn-secondary btn-sm px-3" title="Mundur">&lt;</button>
+            <button id="btnNext" class="btn btn-secondary btn-sm px-3" title="Maju (Redo)" disabled>&gt;</button>
+        </div>
+        <div class="input-group input-group-sm">
+            <span class="input-group-text bg-dark text-secondary border-secondary">FEN</span>
+            <input type="text" id="fenInput" class="form-control bg-black text-white-50 border-secondary" readonly>
         </div>
     </div>
 
     <div class="col-lg-7">
-        <div class="card shadow-sm border-secondary bg-dark h-100">
-            <div class="card-header bg-secondary bg-opacity-10 border-secondary text-white d-flex justify-content-between align-items-center">
-                <span class="fw-bold">📊 Move Statistics</span>
-                <span class="badge bg-primary text-dark">Total Games: {{ stats_list|length }} Variations</span>
+        
+        <div class="card mb-3 border-secondary bg-dark">
+            <div class="card-body py-3">
+                <form method="get" class="row g-2 align-items-end">
+                    <div class="col-md-5">
+                        <label class="form-label text-white-50 small mb-1">Opponent:</label>
+                        <input type="text" name="opponent" class="form-control form-control-sm bg-black text-white border-secondary" 
+                               placeholder="Cari pemain..." value="{{ request.GET.opponent }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label text-white-50 small mb-1">(You) Play as:</label>
+                        <select name="color" class="form-select form-select-sm bg-black text-white border-secondary">
+                            <option value="white" {% if request.GET.color == 'white' %}selected{% endif %}>⚪ You white (vs Black)</option>
+                            <option value="black" {% if request.GET.color == 'black' %}selected{% endif %}>⚫ You black (vs White)</option>
+                            <option value="" {% if not request.GET.color %}selected{% endif %}>Select</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold">Apply</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="alert {% if is_opponent_turn %}alert-warning{% else %}alert-info{% endif %} d-flex align-items-center shadow-sm mb-3 py-2">
+            
+            <div>
+                <strong id="moveStatusText" class="d-block text-uppercase small" style="letter-spacing: 1px;">
+                    Move {{ move_number }} — {{ turn_color }} To Move
+                </strong>
+                
+            </div>
+        </div>
+
+        <div class="mb-3 p-2 bg-dark border border-secondary rounded text-white d-flex flex-wrap align-items-center" style="min-height: 40px;">
+             <span class="text-muted small me-2">Moves:</span>
+             <div id="breadcrumbs" class="d-flex flex-wrap gap-1">
+                 <span class="text-white-50 small">Start Position</span>
+             </div>
+        </div>
+
+        <div class="card shadow-sm border-secondary bg-dark">
+            <div class="card-header border-secondary text-white d-flex justify-content-between align-items-center 
+                        {% if is_opponent_turn %}bg-warning bg-opacity-10{% else %}bg-info bg-opacity-10{% endif %}">
+                <span id="tableHeaderTitle" class="fw-bold small text-uppercase" style="letter-spacing: 1px;">
+                    OPENING STATISTICS
+                </span>
+                
+                <button id="btnViewGames" class="btn btn-xs btn-outline-light py-0" style="font-size: 0.8rem;">
+                    📂 Lihat Game di Posisi Ini ↗
+                </button>
+            </div>
+
+            <div class="p-2 border-bottom border-secondary bg-black text-center">
+                <span class="badge bg-warning text-dark me-2" id="ecoCode" style="font-size: 0.9em;">-</span>
+                <span class="text-white fw-bold" id="openingName" style="font-size: 1.1em; letter-spacing: 0.5px;">
+                    Starting Position
+                </span>
             </div>
             
             <div class="table-responsive">
-                <table class="table table-dark table-hover align-middle mb-0 text-center">
-                    <thead class="bg-secondary bg-opacity-25">
+                <table class="table table-dark table-hover align-middle mb-0 text-center small">
+                    <thead class="bg-black">
                         <tr>
-                            <th class="text-start ps-4">Move</th>
+                            <th class="text-start ps-3">Move</th>
                             <th>Games</th>
-                            <th class="text-success">White Win</th>
-                            <th class="text-secondary">Draw</th>
-                            <th class="text-danger">Black Win</th>
+                            <th class="text-success">Win %</th>
+                            <th class="text-secondary">Draw %</th>
+                            <th class="text-danger">Loss %</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        {% for data in stats_list|dictsortreversed:"total" %}
-                        <tr>
-                            <td class="text-start ps-4">
-                                <span class="fw-bold text-info" style="font-family: 'JetBrains Mono', monospace; font-size: 1.1em;">
-                                    {{ data.move }}
-                                </span>
+                    <tbody id="statsTableBody">
+                        {% for data in stats_list %}
+                        {% widthratio data.wins data.total 100 as win_pct %}
+                        {% widthratio data.draws data.total 100 as draw_pct %}
+                        {% widthratio data.losses data.total 100 as loss_pct %}
+                        
+                        <tr style="cursor: pointer;" onclick="makeMove('{{ data.move }}')">
+                            <td class="text-start ps-3">
+                                <span class="fw-bold text-white font-monospace fs-6">{{ data.move }}</span>
                             </td>
-                            
-                            <td class="fw-bold">{{ data.total }}</td>
-                            
-                            <td>
-                                <div class="d-flex flex-column align-items-center">
-                                    <span class="text-success fw-bold">{% widthratio data.wins data.total 100 %}%</span>
-                                    <small class="text-muted" style="font-size: 0.7em;">{{ data.wins }}</small>
-                                </div>
-                            </td>
-                            
-                            <td>
-                                <div class="d-flex flex-column align-items-center">
-                                    <span class="text-white-50">{% widthratio data.draws data.total 100 %}%</span>
-                                    <small class="text-muted" style="font-size: 0.7em;">{{ data.draws }}</small>
-                                </div>
-                            </td>
-                            
-                            <td>
-                                <div class="d-flex flex-column align-items-center">
-                                    <span class="text-danger fw-bold">{% widthratio data.losses data.total 100 %}%</span>
-                                    <small class="text-muted" style="font-size: 0.7em;">{{ data.losses }}</small>
+                            <td class="fw-bold text-white-50">{{ data.total }}</td>
+                            <td colspan="3" class="px-2" style="width: 60%;">
+                                <div class="progress" style="height: 20px; background-color: #222;">
+                                    <div class="progress-bar bg-success" style="width: {{ win_pct }}%">{{ win_pct }}%</div>
+                                    <div class="progress-bar bg-secondary" style="width: {{ draw_pct }}%">{{ draw_pct }}%</div>
+                                    <div class="progress-bar bg-danger" style="width: {{ loss_pct }}%">{{ loss_pct }}%</div>
                                 </div>
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="5" class="py-5 text-muted">
-                                <em>Belum ada data permainan di database.</em><br>
-                                <a href="{% url 'upload_pgn' %}" class="btn btn-sm btn-outline-primary mt-2">Upload PGN</a>
+                            <td colspan="5" class="py-4 text-muted">
+                                <em>Tidak ada data langkah di posisi ini.</em>
                             </td>
                         </tr>
                         {% endfor %}
@@ -88,25 +139,310 @@
                 </table>
             </div>
         </div>
-    </div>
-</div>
+        
+        </div>  
+
+<script type="importmap">
+{
+    "imports": {
+        "cm-chessboard": "{% static 'src/Chessboard.js' %}"
+    }
+}
+</script>
 
 <script type="module">
-  import { Chessboard } from "{% static 'src/Chessboard.js' %}";
+    import { Chessboard, INPUT_EVENT_TYPE, COLOR } from "cm-chessboard";
+    import { Markers, MARKER_TYPE } from "{% static 'src/extensions/markers/Markers.js' %}";
+    import { Chess } from "{% static 'js/chess.js' %}";
 
-  const container = document.getElementById("board");
+    const container = document.getElementById('board');
+    const game = new Chess(); // Wasit Lokal (Penyimpan Sejarah)
 
-  const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    let redoStack = [];
+    
+    // Ambil Filter Awal dari HTML (Value Input)
+    const opponentFilterInput = document.querySelector('input[name="opponent"]');
+    const colorFilterInput = document.querySelector('select[name="color"]');
+    
+    // Ambil FEN awal dari URL (jika ada) atau default start
+    const urlParams = new URLSearchParams(window.location.search);
+    const currentFen = urlParams.get('fen') || "start";
+    
+    // Load posisi ke Wasit
+    if (currentFen !== "start") {
+        try { game.load(currentFen); } catch(e) { console.error(e); }
+    }
+    document.getElementById("fenInput").value = game.fen();
 
-  const board = new Chessboard(container, {
-    position: START_FEN,
-    assetsUrl: "{% static '/' %}",
-    style: {
-      pieces: {
-        file: "assets/pieces/standard.svg",
-      },
-    },
-  });
+    // INIT BOARD
+    const board = new Chessboard(container, {
+        position: game.fen(),
+        assetsUrl: "{% static 'assets/' %}", 
+        style: {
+            cssClass: "green",
+            pieces: { file: "pieces/standard.svg" }
+        },
+        extensions: [{ class: Markers, props: { autoMarkers: MARKER_TYPE.frame } }],
+        responsive: true
+    });
+
+    async function fetchStats() {
+        const currentFen = game.fen();
+        const tbody = document.getElementById('statsTableBody'); 
+        // Update UI FEN
+        document.getElementById('fenInput').value = currentFen;
+        updateInfoUI();         // <--- Update teks Move/Turn
+        updateBreadcrumbs();
+        
+        // Ambil nilai filter saat ini
+        const opponent = opponentFilterInput ? opponentFilterInput.value : "";
+        const color = colorFilterInput ? colorFilterInput.value : "";
+
+        // Panggil Backend API
+        const url = `{% url 'api_opening_stats' %}?fen=${encodeURIComponent(currentFen)}&opponent=${encodeURIComponent(opponent)}&color=${encodeURIComponent(color)}`;
+        try {
+            // Tampilkan loading (opsional)
+            // tbody.innerHTML = '<tr><td colspan="5" class="py-4 text-muted">Memuat...</td></tr>';
+            
+            const response = await fetch(url);
+            const data = await response.json();
+            renderTable(data.stats);
+
+            if (data.opening) {
+                // Update Kode ECO (Badge Kuning)
+                const ecoBadge = document.getElementById('ecoCode');
+                if(ecoBadge) ecoBadge.textContent = data.opening.code;
+
+                // Update Nama (Teks Putih)
+                const nameText = document.getElementById('openingName');
+                if(nameText) nameText.textContent = data.opening.name;
+            }
+        } catch (error) {
+            console.error('Error fetching stats:', error);
+        }
+        
+        // Update juga URL browser (tanpa reload) agar bisa di-share/back
+        const newUrl = new URL(window.location);
+        newUrl.searchParams.set('fen', currentFen);
+        window.history.pushState({}, '', newUrl);
+    }
+
+    // --- FUNGSI UPDATE JEJAK LANGKAH (BREADCRUMBS) ---
+    function updateBreadcrumbs() {
+        const history = game.history();
+        const breadcrumbsDiv = document.getElementById('breadcrumbs');
+        
+        if (!breadcrumbsDiv) return; // Cek agar tidak error jika div tidak ada
+
+        if (history.length === 0) {
+            breadcrumbsDiv.innerHTML = '<span class="text-white-50 small">Start Position</span>';
+            return;
+        }
+        
+        let html = '';
+        history.forEach((move, i) => {
+            // Tambahkan nomor langkah setiap 2 gerakan (langkah putih)
+            if (i % 2 === 0) {
+                html += `<span class="text-muted ms-2 small">${Math.floor(i/2) + 1}.</span>`;
+            }
+            // Tampilkan notasi langkah (SAN)
+            html += `<span class="badge bg-secondary ms-1 border border-secondary text-white">${move}</span>`;
+        });
+        
+        breadcrumbsDiv.innerHTML = html;
+    }
+
+    function updateInfoUI() {
+        const statusEl = document.getElementById("moveStatusText");
+        if (statusEl) {
+            // Ambil data dari chess.js
+            // game.turn() -> 'w' atau 'b'
+            const turnColor = game.turn() === 'w' ? "White" : "Black";
+            
+            // Ambil nomor langkah dari FEN (elemen terakhir string FEN)
+            // FEN: rnbqk... - 0 1  <-- Angka 1 di akhir adalah move number
+            const fenParts = game.fen().split(' ');
+            const moveNum = fenParts[5]; 
+
+            // Update Teks
+            statusEl.textContent = `Move ${moveNum} — ${turnColor} To Move`;
+        }
+
+        const tableHeader = document.getElementById("tableHeaderTitle");
+        const history = game.history();
+
+        if (tableHeader) {
+            if (history.length === 0) {
+                // Belum ada langkah (Posisi Awal)
+                tableHeader.innerHTML = `OPENING STATISTICS`;
+            } else {
+                // Sudah ada langkah
+                tableHeader.innerHTML = `MOVE STATISTICS`;
+            }
+        }
+    }
+
+    // --- RENDER TABEL ---
+    function renderTable(stats) {
+        // Pastikan di HTML kamu tabelnya punya <tbody id="statsTableBody">
+        const tbody = document.getElementById('statsTableBody'); 
+        if (!tbody) return;
+        
+        tbody.innerHTML = "";
+
+        if (stats.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="py-4 text-muted">Tidak ada data langkah di posisi ini.</td></tr>';
+            return;
+        }
+
+        stats.forEach(row => {
+            // Hitung Persentase
+            const winPct = Math.round((row.wins / row.total) * 100);
+            const drawPct = Math.round((row.draws / row.total) * 100);
+            const lossPct = Math.round((row.losses / row.total) * 100);
+            
+            const tr = document.createElement('tr');
+            tr.style.cursor = 'pointer';
+            tr.onclick = () => makeMove(row.move); // Klik baris -> Jalan di papan
+            
+            // Render Baris Tabel (Sesuai desainmu)
+            tr.innerHTML = `
+                <td class="text-start ps-3"><span class="fw-bold text-white font-monospace fs-6">${row.move}</span></td>
+                <td class="fw-bold text-white-50">${row.total}</td>
+                <td colspan="3" class="px-2" style="width: 60%;">
+                    <div class="progress" style="height: 20px; background-color: #222;">
+                        <div class="progress-bar bg-success" style="width: ${winPct}%">${winPct}%</div>
+                        <div class="progress-bar bg-secondary" style="width: ${drawPct}%">${drawPct}%</div>
+                        <div class="progress-bar bg-danger" style="width: ${lossPct}%">${lossPct}%</div>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // --- INTERAKSI ---
+    
+    // 1. Jalan dari Klik Tabel
+    window.makeMove = (san) => {
+        const move = game.move(san);
+        if (move) {
+            board.setPosition(game.fen(), true);
+            fetchStats();
+        }
+    };
+
+    // 2. Drag & Drop
+    
+
+    // 3. Tombol "Lihat Game" (Update Link Dinamis)
+    const btnViewGames = document.getElementById("btnViewGames");
+    if (btnViewGames) {
+        btnViewGames.addEventListener("click", () => {
+             const fen = game.fen().split(" ")[0];
+             // Pastikan filter opponent/color juga terbawa
+             const opponent = opponentFilterInput ? opponentFilterInput.value : "";
+             const color = colorFilterInput ? colorFilterInput.value : "";
+             
+             // Redirect ke Game List
+             const url = "{% url 'game_list' %}?fen=" + encodeURIComponent(fen) + "&q=" + encodeURIComponent(opponent);
+             window.location.href = url;
+        });
+    }
+
+    // INIT PERTAMA KALI
+    // Panggil fetchStats() untuk mengisi tabel saat pertama buka
+    fetchStats(); 
+
+    function updateNavButtons() {
+        document.getElementById("btnPrev").disabled = (game.history().length === 0);
+        document.getElementById("btnStart").disabled = (game.history().length === 0);
+        document.getElementById("btnNext").disabled = (redoStack.length === 0);
+    }
+
+    document.getElementById("btnPrev").addEventListener("click", () => {
+        const move = game.undo();
+        if (move) {
+            redoStack.push(move); // Simpan masa depan
+            board.setPosition(game.fen());
+            fetchStats(); // Update statistik posisi sebelumnya
+            updateNavButtons();
+            updateBreadcrumbs(); // (Jika kamu pakai breadcrumbs)
+        }
+    });
+
+    // 2. TOMBOL NEXT (Maju - Hanya Redo)
+    document.getElementById("btnNext").addEventListener("click", () => {
+        if (redoStack.length > 0) {
+            const move = redoStack.pop();
+            game.move(move);
+            board.setPosition(game.fen());
+            fetchStats();
+            updateNavButtons();
+            updateBreadcrumbs();
+        }
+    });
+
+    // 3. TOMBOL START (Reset Total)
+    document.getElementById("btnStart").addEventListener("click", () => {
+        // Mundur sampai habis
+        while (game.undo()) { 
+            // Opsional: Simpan ke redoStack kalau mau bisa di-redo semua
+            // redoStack.push(game.undo()); 
+        }
+        game.reset();
+        redoStack = []; // Atau kosongkan redo biar bersih
+        board.setPosition(game.fen());
+        fetchStats();
+        updateNavButtons();
+        updateBreadcrumbs();
+    });
+
+    // --- UPDATE LOGIKA GERAK (PENTING: Hapus Redo saat buat langkah baru) ---
+
+    window.makeMove = (san) => {
+        const move = game.move(san);
+        if (move) {
+            redoStack = []; // HAPUS MASA DEPAN (karena kita buat cabang baru)
+            board.setPosition(game.fen(), true); // Animasi
+            fetchStats();
+            updateNavButtons();
+            updateBreadcrumbs();
+        }
+    };
+
+    board.enableMoveInput((event) => {
+        switch (event.type) {
+            case INPUT_EVENT_TYPE.moveInputStarted:
+                if (game.turn() === event.piece[0]) return true; return false;
+
+            case INPUT_EVENT_TYPE.validateMoveInput:
+                try {
+                    const move = game.move({
+                        from: event.squareFrom,
+                        to: event.squareTo,
+                        promotion: 'q' 
+                    });
+
+                    if (move) {
+                        redoStack = []; // HAPUS MASA DEPAN
+                        board.setPosition(game.fen()); // Pastikan visual sync
+                        fetchStats();
+                        updateNavButtons();
+                        updateBreadcrumbs();
+                        return true; 
+                    }
+                } catch (e) {}
+                return false;
+        }
+    });
+
+    
+
+    // Init
+    fetchStats();
+    updateNavButtons(); // Set status tombol awal
+
 </script>
 
 {% endblock %}

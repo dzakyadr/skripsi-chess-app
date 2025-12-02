@@ -6,6 +6,17 @@
 
 <h1>Games List</h1>
 
+{% if fen_query %}
+<div class="alert alert-info d-flex justify-content-between align-items-center mb-3 shadow-sm border-info">
+    <div>
+        <strong class="text-info">🎯 Filter Posisi Aktif</strong>
+        <span class="text-white-50 ms-2 small">Menampilkan game yang mengandung posisi papan dari Explorer/Analysis.</span>
+    </div>
+    <a href="{% url 'game_list' %}" class="btn btn-sm btn-light fw-bold text-dark">
+        ❌ Hapus Filter
+    </a>
+</div>
+{% endif %}
 <div class="card mb-4 border-0 shadow-sm" style="background-color: var(--bg-card);">
   <div class="card-body p-1">
     
@@ -21,16 +32,16 @@
       <div class="col-6 col-md-auto">
         <div class="input-group input-group">
         <select name="sort" class="form-select bg-dark text-white border-secondary">
-        <option value="newest" {% if sort == 'newest' %}selected{% endif %}>📅 Newest</option>
-        <option value="oldest" {% if sort == 'oldest' %}selected{% endif %}>📅 Oldest</option>
+        <option value="newest" {% if sort == 'newest' %}selected{% endif %}>Newest</option>
+        <option value="oldest" {% if sort == 'oldest' %}selected{% endif %}>Oldest</option>
         <option disabled>──────────</option>
-        <option value="white_az" {% if sort == 'white_az' %}selected{% endif %}>⚪ Putih (A-Z)</option>
-        <option value="white_za" {% if sort == 'white_za' %}selected{% endif %}>⚪ Putih (Z-A)</option>
+        <option value="white_az" {% if sort == 'white_az' %}selected{% endif %}>White (A-Z)</option>
+        <option value="white_za" {% if sort == 'white_za' %}selected{% endif %}>White (Z-A)</option>
         <option disabled>──────────</option>
-        <option value="black_az" {% if sort == 'black_az' %}selected{% endif %}>⚫ Hitam (A-Z)</option>
-        <option value="black_za" {% if sort == 'black_za' %}selected{% endif %}>⚫ Hitam (Z-A)</option>
+        <option value="black_az" {% if sort == 'black_az' %}selected{% endif %}>Black(A-Z)</option>
+        <option value="black_za" {% if sort == 'black_za' %}selected{% endif %}>Black(Z-A)</option>
         <option disabled>──────────</option>
-        <option value="event_az" {% if sort == 'event_az' %}selected{% endif %}>🏆 Event (A-Z)</option>
+        <option value="event_az" {% if sort == 'event_az' %}selected{% endif %}>Event (A-Z)</option>
       </select>
     </div>
   </div>
@@ -92,12 +103,12 @@
     </tbody>
   </table>
 
-  <!-- Pagination controls -->
   <div style="margin-top:1em;">
-    <span>Halaman {{ games.number }} dari {{ games.paginator.num_pages }}</span>
+    <span>Page {{ games.number }} from {{ games.paginator.num_pages }}</span>
     {% if games.has_previous %}
       <a href="?{% if q %}q={{ q }}&{% endif %}sort={{ sort }}&order={{ order }}&per_page={{ per_page }}&page={{ games.previous_page_number }}">Prev</a>
     {% endif %}
+    <span> | </span>
     {% for p in games.paginator.page_range %}
       {% if p == games.number %}
         <strong>{{ p }}</strong>

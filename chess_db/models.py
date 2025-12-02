@@ -57,3 +57,19 @@ class Meta:
         models.Index(fields=['black_player']),
         models.Index(fields=['event']),
     ]
+    
+    
+class PlayerProfile(models.Model):
+    name = models.CharField(max_length=100, unique=True, help_text="Nama asli atau nama utama")
+    
+    def __str__(self):
+        return self.name
+
+# 3. MODEL ALIAS (INI JUGA)
+class PlayerAlias(models.Model):
+    profile = models.ForeignKey(PlayerProfile, on_delete=models.CASCADE, related_name='aliases')
+    username = models.CharField(max_length=100, help_text="Username di PGN (misal: DrNykterstein)")
+    platform = models.CharField(max_length=50, blank=True, null=True)
+    
+    def __str__(self):
+        return f"{self.username} -> {self.profile.name}"
