@@ -20,5 +20,9 @@ urlpatterns = [
     path('analysis/', views.analysis_board, name='analysis_board'),
     
     path('api/opening-stats/', views.api_opening_stats, name='api_opening_stats'),
+    
+    path('games/advanced/', views.advanced_search, name='advanced_search'), 
+    
+    path('games/bulk-delete/', views.game_bulk_delete, name='game_bulk_delete'),
 ]
     

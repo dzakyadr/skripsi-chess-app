@@ -42,7 +42,7 @@
             </div>
 
             <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">
-                🚀 Upload Sekarang
+                Upload
             </button>
         </form>
       </div>
@@ -52,7 +52,7 @@
             <div class="accordion-item bg-transparent">
               <h2 class="accordion-header" id="headingOne">
                 <button class="accordion-button collapsed bg-transparent text-white-50 shadow-none" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne">
-                  <small>💡 Lihat Contoh Format PGN</small>
+                  <small>Lihat Contoh Format PGN</small>
                 </button>
               </h2>
               <div id="collapseOne" class="accordion-collapse collapse" data-bs-parent="#accordionExample">
@@ -123,7 +123,7 @@
             fileInput.addEventListener('change', (e) => {
                 if (e.target.files && e.target.files.length) {
                     const name = e.target.files[0].name;
-                    displayDiv.innerHTML = `✅ File terpilih: <u>${name}</u>`;
+                    displayDiv.innerHTML = `File selected: <u>${name}</u>`;
                 } else {
                     displayDiv.innerHTML = '';
                 }

@@ -100,113 +100,123 @@ def upload_pgn(request):
 def game_list(request):
     qs = Game.objects.all()
 
-    # --- 1. SEARCH BY FEN (LOGIKA BARU) ---
-    # Ini untuk menangkap request dari Opening Explorer / Analysis Board
-    fen_query = request.GET.get('fen', '').strip()
-    
-    if fen_query and fen_query != 'start':
-        # Kita harus mencari game yang pernah melewati posisi ini.
-        # Karena database kita menyimpan PGN (bukan FEN per langkah), kita harus scan manual.
-        # (Catatan: Ini mungkin agak lambat jika databasenya ribuan, tapi ini solusi terbaik tanpa ubah model)
+    # --- HELPER: SMART ALIAS SEARCH (Code Baru ini penting) ---
+    def get_aliases(name_query):
+        """Mencari nama asli + semua username alternatifnya"""
+        names = {name_query}
+        # Cari di database Profil yang cocok dengan nama ATAU username
+        profiles = PlayerProfile.objects.filter(
+            Q(name__icontains=name_query) | 
+            Q(aliases__username__icontains=name_query)
+        ).distinct()
         
-        matching_ids = []
-        # Ambil bagian posisi bidak saja (sebelum spasi pertama) agar pencarian fleksibel
-        target_board_fen = fen_query.split(' ')[0] 
-        
-        board = chess.Board()
+        for prof in profiles:
+            names.add(prof.name) # Masukkan nama asli
+            for alias in prof.aliases.all():
+                names.add(alias.username) # Masukkan semua akun lain (chess.com, lichess)
+        return names
 
-        # Optimasi: Batasi pencarian ke 1000 game terbaru dulu supaya tidak loading lama
-        # Kalau mau cari semua, hapus [:1000]
-        games_to_scan = qs.order_by('-game_date')[:1000] 
+    # --- 1. FILTER POSISI (FEN) ---
+    fen_query = request.GET.get('fen', '').strip()
+    if fen_query and fen_query != 'start':
+        matching_ids = []
+        target_board_fen = fen_query.split(' ')[0]
+        board = chess.Board()
+        games_to_scan = qs.order_by('-game_date')[:2000] 
 
         for game in games_to_scan:
             try:
                 pgn_io = io.StringIO(game.pgn)
                 game_obj = chess.pgn.read_game(pgn_io)
-                
                 if game_obj:
                     board.reset()
-                    # Cek posisi awal
                     if board.fen().split(' ')[0] == target_board_fen:
                         matching_ids.append(game.id)
                         continue
-
-                    # Cek setiap langkah dalam game
                     for move in game_obj.mainline_moves():
                         board.push(move)
                         if board.fen().split(' ')[0] == target_board_fen:
                             matching_ids.append(game.id)
-                            break # Ketemu! Lanjut ke game berikutnya
+                            break 
             except:
                 continue
-        
-        # Filter QuerySet agar HANYA menampilkan game yang cocok
         qs = qs.filter(id__in=matching_ids)
 
-    # --- 2. SEARCH BIASA (Nama, Event, dll) ---
+    # --- 2. ADVANCED FILTERS (Dari Form Advanced) ---
+    # Filter Pemain Spesifik (Kolom White/Black di Advanced Search)
+    white_filter = request.GET.get('white', '').strip()
+    black_filter = request.GET.get('black', '').strip()
+    ignore_color = request.GET.get('ignore_color')
+
+    if white_filter:
+        # Cari 'white_filter' beserta aliasnya
+        aliases = get_aliases(white_filter)
+        q_obj = Q()
+        for name in aliases:
+            if ignore_color:
+                q_obj |= Q(white_player__icontains=name) | Q(black_player__icontains=name)
+            else:
+                q_obj |= Q(white_player__icontains=name)
+        qs = qs.filter(q_obj)
+
+    if black_filter and not ignore_color:
+        aliases = get_aliases(black_filter)
+        q_obj = Q()
+        for name in aliases:
+            q_obj |= Q(black_player__icontains=name)
+        qs = qs.filter(q_obj)
+
+    # Filter Metadata Lain
+    result = request.GET.get('result')
+    if result: qs = qs.filter(result=result)
+    
+    elo_min = request.GET.get('elo_min')
+    if elo_min: qs = qs.filter(Q(white_elo__gte=elo_min) | Q(black_elo__gte=elo_min))
+    
+    year_start = request.GET.get('year_start')
+    if year_start: qs = qs.filter(game_date__year__gte=year_start)
+    
+    year_end = request.GET.get('year_end')
+    if year_end: qs = qs.filter(game_date__year__lte=year_end)
+
+    eco = request.GET.get('eco')
+    if eco: qs = qs.filter(eco_code__icontains=eco)
+
+
+    # --- 3. SEARCH GENERAL (FIXED) ---
+    # Ini untuk kotak pencarian biasa (?q=...)
     q = request.GET.get('q', '').strip()
     if q:
-        # A. Cek apakah 'q' cocok dengan Profil/Alias di database?
-        profiles = PlayerProfile.objects.filter(
-            Q(name__icontains=q) | 
-            Q(aliases__username__icontains=q)
-        ).distinct()
-
-        # B. Kumpulkan semua nama target
-        target_names = set()
+        # A. Cari kemungkinan Alias dari kata kunci 'q'
+        # (Siapa tau user ngetik "Dzaky", kita harus cari "vestnik713" juga)
+        aliases = get_aliases(q)
         
-        if profiles.exists():
-            # Kalau ketemu profil resmi, ambil SEMUA nama panggilannya
-            for prof in profiles:
-                target_names.add(prof.name)
-                for alias in prof.aliases.all():
-                    target_names.add(alias.username)
-        else:
-            # Kalau tidak ada profil, cari teks apa adanya
-            target_names.add(q)
-        
-        # C. Susun Query Database
-        # Kita mencari game yang:
-        # 1. Pemainnya ada di daftar 'target_names' (Smart Search)
-        # 2. ATAU Event/Opening mengandung teks 'q' (Search Biasa)
-        
+        # B. Bikin Query Besar
         search_query = Q()
         
-        # Filter Pemain (Cerdas)
-        for name in target_names:
+        # 1. Cek Nama Pemain (White ATAU Black)
+        for name in aliases:
             search_query |= Q(white_player__icontains=name) | Q(black_player__icontains=name)
             
-        # Filter Metadata lain (Event/Opening) - Tetap pakai teks asli user 'q'
-        search_query |= Q(event__icontains=q) | Q(opening__icontains=q)
+        # 2. Cek Metadata (Event, Site, Opening, ECO)
+        search_query |= Q(event__icontains=q) | Q(site__icontains=q) | Q(eco_code__icontains=q) | Q(opening__icontains=q)
         
-        # Terapkan filter
+        # Terapkan Filter
         qs = qs.filter(search_query)
 
-    # --- 3. SORTING ---
+    # --- 4. SORTING & PAGINATION ---
     sort_param = request.GET.get('sort', 'newest')
     sort_options = {
         'newest': '-game_date',
         'oldest': 'game_date',
         'white_az': 'white_player',
-        'white_za': '-white_player',
         'black_az': 'black_player',
-        'black_za': '-black_player',
-        'event_az': 'event',
-        'id': '-id',
+        'elo_high': '-white_elo',
     }
-    order_by_field = sort_options.get(sort_param, '-game_date')
-    qs = qs.order_by(order_by_field)
+    qs = qs.order_by(sort_options.get(sort_param, '-game_date'))
 
-    # --- 4. PAGINATION ---
-    try:
-        per_page = int(request.GET.get('per_page', 10))
-        if per_page <= 0 or per_page > 200: per_page = 10
-    except (ValueError, TypeError):
-        per_page = 10
-
-    paginator = Paginator(qs, per_page)
+    paginator = Paginator(qs, 10)
     page = request.GET.get('page', 1)
-    
     try:
         games_page = paginator.page(page)
     except PageNotAnInteger:
@@ -214,25 +224,18 @@ def game_list(request):
     except EmptyPage:
         games_page = paginator.page(paginator.num_pages)
 
-    # Hitung offset untuk penomoran tabel
-    try:
-        current_page_number = int(games_page.number)
-    except:
-        current_page_number = 1
-    offset = (current_page_number - 1) * per_page
+    try: offset = (int(games_page.number) - 1) * 10
+    except: offset = 0
 
     context = {
         'games': games_page,
-        'q': q,
-        'sort': sort_param,
-        'per_page': per_page,
         'paginator': paginator,
         'offset': offset,
-        'fen_query': fen_query, # Kirim data FEN ke template (untuk info alert)
+        'fen_query': fen_query,
+        'request': request 
     }
     
     return render(request, 'chess_db/game_list.html', context)
-
 
 def analysis_board(request):
     # 1. Cek parameter di URL
@@ -596,3 +599,22 @@ def api_opening_stats(request):
         'searched_aliases': list(target_names) if opponent else [], # (Kalau kamu pakai logika alias)
         'opening': {'code': eco_code, 'name': opening_name} # <-- KIRIM DATA INI
     })
+    
+def advanced_search(request):
+    return render(request, 'chess_db/advanced_search.html')
+
+@require_POST # Hanya boleh diakses lewat tombol submit (POST)
+def game_bulk_delete(request):
+    # Ambil semua ID yang dicentang (nama inputnya 'selected_games')
+    game_ids = request.POST.getlist('selected_games')
+    
+    if game_ids:
+        # Hapus game yang ID-nya ada di dalam list tersebut
+        # delete() di QuerySet itu efisien, langsung hapus banyak sekaligus
+        deleted_count, _ = Game.objects.filter(id__in=game_ids).delete()
+        
+        messages.success(request, f"Berhasil menghapus {deleted_count} game.")
+    else:
+        messages.warning(request, "Tidak ada game yang dipilih.")
+        
+    return redirect('game_list')

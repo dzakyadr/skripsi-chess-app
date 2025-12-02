@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}Advanced Search{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card border-info bg-dark shadow-lg">
+                <div class="card-header bg-info bg-opacity-10 border-info text-info fw-bold">
+                    ⚙️ Advanced Search Criteria
+                </div>
+                <div class="card-body p-4">
+                    <form action="{% url 'game_list' %}" method="get">
+                        
+                        <h5 class="text-white mb-3 border-bottom border-secondary pb-2">Players</h5>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label text-white-50">White Player</label>
+                                <input type="text" name="white" class="form-control bg-black text-white border-secondary" placeholder="Nama / Alias...">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-white-50">Black Player</label>
+                                <input type="text" name="black" class="form-control bg-black text-white border-secondary" placeholder="Nama / Alias...">
+                            </div>
+                            <div class="col-md-12">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="ignore_color" id="ignoreColor">
+                                    <label class="form-check-label text-white-50" for="ignoreColor">
+                                        Abaikan Warna (Cari pemain ini di sisi mana saja)
+                                        <small class="d-block text-muted">*Jika dicentang, input "White Player" akan dicari sebagai Putih ATAU Hitam.</small>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h5 class="text-white mb-3 border-bottom border-secondary pb-2">Game Details</h5>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <label class="form-label text-white-50">Result</label>
+                                <select name="result" class="form-select bg-black text-white border-secondary">
+                                    <option value="">Any Result</option>
+                                    <option value="1-0">1-0 (White Won)</option>
+                                    <option value="0-1">0-1 (Black Won)</option>
+                                    <option value="1/2-1/2">½-½ (Draw)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-white-50">Min ELO</label>
+                                <input type="number" name="elo_min" class="form-control bg-black text-white border-secondary" placeholder="2000">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-white-50">Max ELO</label>
+                                <input type="number" name="elo_max" class="form-control bg-black text-white border-secondary" placeholder="3000">
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label text-white-50">Year (From)</label>
+                                <input type="number" name="year_start" class="form-control bg-black text-white border-secondary" placeholder="e.g. 2020">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-white-50">Year (To)</label>
+                                <input type="number" name="year_end" class="form-control bg-black text-white border-secondary" placeholder="e.g. 2025">
+                            </div>
+                        </div>
+
+                        <h5 class="text-white mb-3 border-bottom border-secondary pb-2">Opening & Event</h5>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <label class="form-label text-white-50">ECO Code</label>
+                                <input type="text" name="eco" class="form-control bg-black text-white border-secondary" placeholder="e.g. B90">
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label text-white-50">Event / Site</label>
+                                <input type="text" name="q" class="form-control bg-black text-white border-secondary" placeholder="Nama Turnamen...">
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-info fw-bold text-dark">
+                                🔍 SEARCH DATABASE
+                            </button>
+                            <a href="{% url 'game_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                        </div>
+
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

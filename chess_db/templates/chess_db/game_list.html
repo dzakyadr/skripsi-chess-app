@@ -17,6 +17,7 @@
     </a>
 </div>
 {% endif %}
+
 <div class="card mb-4 border-0 shadow-sm" style="background-color: var(--bg-card);">
   <div class="card-body p-1">
     
@@ -47,18 +48,36 @@
   </div>
 
       <div class="col-12 col-md-auto d-flex gap-2">
-        <button type="submit" class="btn btn-primary w-100">Filter</button>
+        <button type="submit" class="btn btn-primary w-100">Apply</button>
+        <div class="col-auto">
+          <a href="{% url 'advanced_search' %}" class="btn btn-primary" title="Advanced Search">
+            Advanced Search
+          </a>
+      </div>
         <a href="{% url 'game_list' %}" class="btn btn-outline-secondary" title="Reset">↻</a>
       </div>
+      
 
     </form>
   </div>
 </div>
 
 {% if games %}
+<form method="post" action="{% url 'game_bulk_delete' %}" id="bulkDeleteForm">
+        {% csrf_token %}
+
+        <div style="margin-bottom: 10px; text-align: right;">
+        <button type="submit" 
+                onclick="return confirm('Yakin ingin menghapus game yang dicentang?');"
+                style="background-color: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-weight: bold;">
+            🗑️ Hapus Terpilih
+        </button>
+    </div>
+        
   <table style="border-collapse: collapse; width: 100%;">
     <thead>
-      <tr>
+        <th style="border-bottom:1px solid #ccc; padding:6px; text-align:center; width: 30px;">
+          <input type="checkbox" id="selectAll"></th>
         <th style="border-bottom:1px solid #ccc; padding:6px; text-align:left;">No</th>
         <th style="border-bottom:1px solid #ccc; padding:6px; text-align:left;">Event</th>
         <th style="border-bottom:1px solid #ccc; padding:6px; text-align:left;">White</th>
@@ -73,6 +92,9 @@
     <tbody>
       {% for g in games %}
       <tr>
+          <td style="padding:6px; vertical-align:top; text-align:center;">
+            <input type="checkbox" name="selected_games" value="{{ g.id }}" class="game-checkbox">
+          </td>
         <td style="padding:6px; vertical-align:top;">{{ offset|add:forloop.counter }}</td>
         <td style="padding:6px; vertical-align:top;"><a href="{% url 'game_detail' g.id %}">{{ g.event|default:"-" }}</a></td>
         <td style="padding:6px; vertical-align:top;">{{ g.white_player }}</td>
@@ -91,17 +113,18 @@
         </td>
           <td style="padding:6px; vertical-align:top;">
             <a href="{% url 'game_edit' g.id %}">Edit</a>
-            <form method="post" action="{% url 'game_delete' g.id %}" style="display: inline; margin-left: 8px;" onsubmit="return confirm('Apakah Anda yakin ingin menghapus game ini?');">
-        {% csrf_token %}
-        <button type="submit" style="color: #dc3545; background: none; border: none; padding: 0; font-family: inherit; font-size: inherit; cursor: pointer; text-decoration: none;">
+            <button type="submit" 
+                formaction="{% url 'game_delete' g.id %}" 
+                onclick="return confirm('Apakah Anda yakin ingin menghapus game ini?');"
+                style="color: #dc3545; background: none; border: none; padding: 0; font-family: inherit; font-size: inherit; cursor: pointer; text-decoration: none; margin-left: 8px;">
             Delete
         </button>
-        </form>
         </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
+  </form>
 
   <div style="margin-top:1em;">
     <span>Page {{ games.number }} from {{ games.paginator.num_pages }}</span>
@@ -124,5 +147,21 @@
 {% else %}
   <p>Belum ada permainan.</p>
 {% endif %}
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const selectAllCheckbox = document.getElementById('selectAll');
+        const gameCheckboxes = document.querySelectorAll('.game-checkbox');
+
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', function() {
+                const isChecked = this.checked;
+                gameCheckboxes.forEach(box => {
+                    box.checked = isChecked;
+                });
+            });
+        }
+    });
+</script>
 
 {% endblock %}
