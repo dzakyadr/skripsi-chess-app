@@ -13,17 +13,32 @@ import chess
 from django.http import JsonResponse
 from .models import Game, PlayerProfile, PlayerAlias
 from .eco_data import get_opening_name 
+from datetime import datetime
 
 def upload_pgn(request):
     if request.method == 'POST':
         form = UploadPgnForm(request.POST, request.FILES)
         if form.is_valid():
             pgn_file = request.FILES['pgn_file']
+            
+            # --- [LANGKAH 1] CEK EKSTENSI MANUAL (Biar ga lolos rename) ---
+            # Kita paksa cek akhiran file. Jika bukan .pgn, langsung tendang.
+            filename = pgn_file.name.lower()
+            if not filename.endswith('.pgn'):
+                messages.warning(
+                    request, "File PGN tidak valid atau tidak berisi permainan.")
+                return redirect('game_list') # Redirect ke list biar kerasa feedbacknya
 
-            # --- Perbaikanmu yang bagus: errors='ignore' ---
-            raw_text = pgn_file.read().decode('utf-8', errors='ignore')
+            # --- [LANGKAH 2] SANITASI CRASH & DECODE ---
+            try:
+                # errors='ignore' biar karakter aneh ga bikin stop
+                # replace('\x00', '') biar database ga crash (PENTING!)
+                raw_text = pgn_file.read().decode('utf-8', errors='ignore').replace('\x00', '')
+            except Exception as e:
+                messages.error(request, "File rusak atau tidak terbaca.")
+                return redirect('game_list')
+
             pgn_io = io.StringIO(raw_text)
-
             games_processed_count = 0
 
             # --- INI KITA KEMBALIKAN: while loop agar bisa baca BANYAK game ---
@@ -184,11 +199,10 @@ def game_list(request):
 
 
     # --- 3. SEARCH GENERAL (FIXED) ---
-    # Ini untuk kotak pencarian biasa (?q=...)
+    
     q = request.GET.get('q', '').strip()
     if q:
-        # A. Cari kemungkinan Alias dari kata kunci 'q'
-        # (Siapa tau user ngetik "Dzaky", kita harus cari "vestnik713" juga)
+       
         aliases = get_aliases(q)
         
         # B. Bikin Query Besar
@@ -262,6 +276,37 @@ def analysis_board(request):
         'initial_fen': initial_fen
     }
     return render(request, 'chess_db/analysis_board.html', context)
+
+# Pastikan import ini ada di bagian paling atas file views.py
+from datetime import datetime 
+
+# --- Tambahkan fungsi ini di paling bawah file views.py ---
+
+def save_analysis(request):
+    if request.method == 'POST':
+        # Ambil data dari form modal
+        white_name = request.POST.get('white_player', 'Player (White)')
+        black_name = request.POST.get('black_player', 'Analysis (Black)')
+        event_name = request.POST.get('event', 'Manual Analysis')
+        result_res = request.POST.get('result', '*')
+        pgn_data = request.POST.get('pgn_data', '') # Ini PGN dari JavaScript
+
+        # Buat Game Baru
+        new_game = Game.objects.create(
+            white_player=white_name,
+            black_player=black_name,
+            event=event_name,
+            result=result_res,
+            game_date=datetime.now().date(), # Tanggal hari ini
+            pgn=pgn_data, # Simpan langkah yang sudah dibuat
+            site="Local Analysis"
+        )
+        
+        messages.success(request, "Analisis berhasil disimpan sebagai permainan baru!")
+        return redirect('game_detail', game_id=new_game.id)
+    
+    # Jika bukan POST, kembalikan ke halaman analisis (sesuaikan nama url-nya jika beda)
+    return redirect('game_list')
 
 def game_detail(request, game_id):
     game = get_object_or_404(Game, pk=game_id)
@@ -618,3 +663,30 @@ def game_bulk_delete(request):
         messages.warning(request, "Tidak ada game yang dipilih.")
         
     return redirect('game_list')
+
+# Pastikan import ini ada
+from .eco_data import get_opening_name
+
+def api_identify_opening(request):
+    """
+    API Ringan: Langsung cari nama opening dari string FEN.
+    Tanpa validasi chess.Board() yang ketat agar tidak mudah error.
+    """
+    fen = request.GET.get('fen', '').strip()
+    
+    # Jika FEN kosong atau 'start', gunakan FEN posisi awal standar
+    if not fen or fen == 'start':
+        fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    
+    # Langsung cari di kamus ECO (Fungsi ini sudah aman karena memotong string sendiri)
+    eco_code, opening_name = get_opening_name(fen)
+    
+    # Pastikan ada hasil default
+    if not opening_name:
+        eco_code = "-"
+        opening_name = "Unknown Opening"
+        
+    return JsonResponse({
+        'eco': eco_code,
+        'name': opening_name
+    })

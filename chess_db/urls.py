@@ -24,5 +24,9 @@ urlpatterns = [
     path('games/advanced/', views.advanced_search, name='advanced_search'), 
     
     path('games/bulk-delete/', views.game_bulk_delete, name='game_bulk_delete'),
+    
+    path('api/identify-opening/', views.api_identify_opening, name='api_identify_opening'),
+    
+    path('analysis/save/', views.save_analysis, name='save_analysis'),
 ]
     

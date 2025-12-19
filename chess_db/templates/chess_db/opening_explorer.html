@@ -87,7 +87,7 @@
                 </span>
                 
                 <button id="btnViewGames" class="btn btn-xs btn-outline-light py-0" style="font-size: 0.8rem;">
-                    📂 Lihat Game di Posisi Ini ↗
+                    Lihat Game di Posisi Ini ↗
                 </button>
             </div>
 
@@ -156,19 +156,19 @@
     import { Chess } from "{% static 'js/chess.js' %}";
 
     const container = document.getElementById('board');
-    const game = new Chess(); // Wasit Lokal (Penyimpan Sejarah)
+    const game = new Chess();
 
     let redoStack = [];
     
-    // Ambil Filter Awal dari HTML (Value Input)
+    
     const opponentFilterInput = document.querySelector('input[name="opponent"]');
     const colorFilterInput = document.querySelector('select[name="color"]');
     
-    // Ambil FEN awal dari URL (jika ada) atau default start
+    
     const urlParams = new URLSearchParams(window.location.search);
     const currentFen = urlParams.get('fen') || "start";
     
-    // Load posisi ke Wasit
+   
     if (currentFen !== "start") {
         try { game.load(currentFen); } catch(e) { console.error(e); }
     }
@@ -191,7 +191,7 @@
         const tbody = document.getElementById('statsTableBody'); 
         // Update UI FEN
         document.getElementById('fenInput').value = currentFen;
-        updateInfoUI();         // <--- Update teks Move/Turn
+        updateInfoUI();        
         updateBreadcrumbs();
         
         // Ambil nilai filter saat ini
@@ -201,9 +201,6 @@
         // Panggil Backend API
         const url = `{% url 'api_opening_stats' %}?fen=${encodeURIComponent(currentFen)}&opponent=${encodeURIComponent(opponent)}&color=${encodeURIComponent(color)}`;
         try {
-            // Tampilkan loading (opsional)
-            // tbody.innerHTML = '<tr><td colspan="5" class="py-4 text-muted">Memuat...</td></tr>';
-            
             const response = await fetch(url);
             const data = await response.json();
             renderTable(data.stats);
@@ -332,15 +329,12 @@
         }
     };
 
-    // 2. Drag & Drop
     
-
-    // 3. Tombol "Lihat Game" (Update Link Dinamis)
     const btnViewGames = document.getElementById("btnViewGames");
     if (btnViewGames) {
         btnViewGames.addEventListener("click", () => {
              const fen = game.fen().split(" ")[0];
-             // Pastikan filter opponent/color juga terbawa
+            
              const opponent = opponentFilterInput ? opponentFilterInput.value : "";
              const color = colorFilterInput ? colorFilterInput.value : "";
              

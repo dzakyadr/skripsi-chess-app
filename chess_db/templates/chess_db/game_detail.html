@@ -9,7 +9,7 @@
   <h2 class="fw-bold m-0 text-white">
     <span class="text-primary">{{ game.white_player }}</span> vs <span class="text-danger">{{ game.black_player }}</span>
   </h2>
-  <a href="{% url 'game_edit' game.id %}" class="btn btn-outline-light btn-sm">✏️ Edit Info Game</a>
+  <a href="{% url 'game_edit' game.id %}" class="btn btn-outline-light btn-sm">Edit Info Game</a>
 </div>
 
 <div class="card mb-4 shadow-sm border-secondary" style="background-color: var(--bg-card);">
@@ -34,6 +34,11 @@
   </div>
 </div>
 
+<div class="text-center mb-2">
+    <span class="badge bg-secondary" id="ecoBadge">-</span>
+    <span class="text-white fw-bold ms-2" id="openingName">Starting Position</span>
+</div>
+
 <div class="row g-4">
   <div class="col-lg-7 col-xl-6">
     <link rel="stylesheet" href="{% static 'assets/chessboard.css' %}" />
@@ -45,6 +50,44 @@
       </div>
     </div>
 
+    
+
+    <div class="mt-2 px-2">
+      <input id="moveRange" type="range" class="form-range" min="0" max="0" value="0">
+      <div class="text-center small text-white-50">
+        Move: <span id="moveIndex" class="fw-bold text-white">0</span> / <span id="moveCount">0</span>
+      </div>
+    </div>
+    
+
+    <div class="card mt-4 border-warning bg-transparent">
+      <div class="card-header bg-warning bg-opacity-10 text-warning fw-bold border-warning">
+          Notes
+      </div>
+      <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            <div class="mb-2">
+                <textarea name="notes" class="form-control bg-dark text-white border-secondary" rows="4" placeholder="Tulis catatan...">{{ game.notes|default:"" }}</textarea>
+            </div>
+            <div class="text-end">
+                <button type="submit" class="btn btn-warning btn-sm fw-bold text-dark">Save</button>
+            </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5 col-xl-6">
+    <div class="card shadow-sm bg-dark border-secondary mb-3">
+        <div class="card-header bg-secondary bg-opacity-25 text-white border-secondary py-2"><small class="fw-bold">MOVE LIST</small></div>
+        <div class="card-body p-0" style="height: 400px; overflow-y: auto;">
+            <table class="table table-dark table-striped table-hover table-sm mb-0 text-center" style="font-family: 'JetBrains Mono', monospace;">
+                <thead class="sticky-top bg-secondary"><tr><th class="text-white-50" style="width: 15%;">#</th><th style="width: 42.5%;">White</th><th style="width: 42.5%;">Black</th></tr></thead>
+                <tbody id="moveTableBody"></tbody>
+            </table>
+        </div>
+    </div>
     <div class="mt-3 d-flex align-items-center justify-content-center bg-secondary bg-opacity-10 p-3 rounded border border-secondary">
       <div class="btn-group">
         <button id="prevBtn" class="btn btn-outline-light">◀ Prev</button>
@@ -56,44 +99,10 @@
          data-url="{% url 'analysis_board' %}" 
          data-game-id="{{ game.id }}"
          class="btn btn-info btn-sm ms-3 text-dark fw-bold">
-        🧪 Analysis Board
+        Analysis Board
       </a>
     </div>
-
-    <div class="mt-2 px-2">
-      <input id="moveRange" type="range" class="form-range" min="0" max="0" value="0">
-      <div class="text-center small text-white-50">
-        Move: <span id="moveIndex" class="fw-bold text-white">0</span> / <span id="moveCount">0</span>
-      </div>
-    </div>
     
-    <div class="mt-3 text-center">
-        <button id="searchFenBtn" class="btn btn-outline-secondary btn-sm">🔍 Cari Posisi Ini</button>
-    </div>
-
-    {% if game.notes %}
-    <div class="card mt-4 border-warning bg-transparent">
-      <div class="card-header bg-warning bg-opacity-10 text-warning fw-bold border-warning">📝 Catatan Pribadi</div>
-      <div class="card-body">
-        <form method="post">{% csrf_token %}
-            <div class="mb-2"><textarea name="notes" class="form-control bg-dark text-white border-secondary" rows="4">{{ game.notes|default:"" }}</textarea></div>
-            <div class="text-end"><button type="submit" class="btn btn-warning btn-sm fw-bold text-dark">💾 Simpan</button></div>
-        </form>
-      </div>
-    </div>
-    {% endif %}
-  </div>
-
-  <div class="col-lg-5 col-xl-6">
-    <div class="card shadow-sm bg-dark border-secondary mb-3">
-        <div class="card-header bg-secondary bg-opacity-25 text-white border-secondary py-2"><small class="fw-bold">📋 MOVE LIST</small></div>
-        <div class="card-body p-0" style="height: 400px; overflow-y: auto;">
-            <table class="table table-dark table-striped table-hover table-sm mb-0 text-center" style="font-family: 'JetBrains Mono', monospace;">
-                <thead class="sticky-top bg-secondary"><tr><th class="text-white-50" style="width: 15%;">#</th><th style="width: 42.5%;">White</th><th style="width: 42.5%;">Black</th></tr></thead>
-                <tbody id="moveTableBody"></tbody>
-            </table>
-        </div>
-    </div>
     <div class="card border-secondary bg-transparent">
         <div class="card-header border-secondary bg-secondary bg-opacity-10 py-1"><small class="text-info fw-bold" style="font-size: 0.7rem;">RAW PGN</small></div>
         <pre class="form-control bg-dark text-white-50 border-0 rounded-0 mb-0" style="height: 150px; overflow: auto; white-space: pre-wrap; font-size: 0.85em;">{{ game.pgn|default:"(no pgn)" }}</pre>
@@ -150,6 +159,29 @@
     moveCountEl.textContent = maxMoves;
     moveRange.max = maxMoves;
 
+    // Terima parameter 'fen' dari luar
+    async function fetchOpeningName(fen) {
+        const ecoBadge = document.getElementById('ecoBadge');
+        const nameEl = document.getElementById('openingName');
+        
+        // PENTING: Gunakan 'fen' yang dikirim, bukan game.fen()
+        const url = `{% url 'api_identify_opening' %}?fen=${encodeURIComponent(fen)}`;
+        
+        try {
+            const response = await fetch(url);
+            if (response.ok) {
+                const data = await response.json();
+                
+                // Update Tampilan
+                if (ecoBadge) ecoBadge.textContent = data.eco;
+                if (nameEl) nameEl.textContent = data.name;
+            }
+        } catch (e) {
+            console.error("Gagal ambil nama opening:", e);
+        }
+    }
+    
+
     function renderMoveList() {
         const tbody = document.getElementById("moveTableBody");
         tbody.innerHTML = "";
@@ -191,10 +223,7 @@
 
             // A. Update Papan
             board.setPosition(currentFen, true);
-            
-            // B. UPDATE LINK ANALYSIS (INI PERBAIKANNYA!)
-            // Setiap kali papan berubah, kita update href tombolnya
-            // URL: /chess/analysis/?game_id=1&fen=rnbq...
+            fetchOpeningName(currentFen);
             const fenForUrl = encodeURIComponent(currentFen);
             analysisLink.href = `${analysisBaseUrl}?game_id=${gameId}&fen=${fenForUrl}`;
 

@@ -1,8 +1,13 @@
 from django import forms
 from .models import Game
+from django.core.validators import FileExtensionValidator
+import os
 
 class UploadPgnForm(forms.Form):
-    pgn_file = forms.FileField(label="Pilih File PGN (.pgn)")
+    pgn_file = forms.FileField(
+        label='Pilih File PGN',
+    )
+    
     
 class GameEditForm(forms.ModelForm):
     class Meta:
