@@ -8,7 +8,7 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h2 class="fw-bold m-0 text-white">Analysis Board</h2>
-        <p class="text-white-50 mb-0">Analisis langkah demi langkah.</p>
+        <p class="text-white-50 mb-0">Analysis with Stockfish.</p>
     </div>
     <div class="btn-group">
         <button id="flipBtn" class="btn btn-outline-light btn-sm">Flip Board</button>
@@ -282,10 +282,10 @@
         if (isMainLine && moveIndex < mainLineMoves.length) {
             // KITA DI JALUR ASLI -> Tampilkan Langkah Selanjutnya
             const nextMove = mainLineMoves[moveIndex];
-            statusEl.innerHTML = `${turnText} | <span class="text-warning cursor-pointer" onclick="playMainMove('${nextMove}')">👉 Game Asli: <b>${nextMove}</b></span>`;
+            statusEl.innerHTML = `${turnText} | <span class="text-warning cursor-pointer" onclick="playMainMove('${nextMove}')">Original Movement: <b>${nextMove}</b></span>`;
         } else if (!isMainLine) {
             // KITA MELENCENG -> Tampilkan Info Variasi
-            statusEl.innerHTML = `${turnText} | <span class="text-info">🧪 Variasi Analisis</span>`;
+            statusEl.innerHTML = `${turnText} | <span class="text-info">Analysis Mode</span>`;
         } else {
             statusEl.textContent = turnText;
         }

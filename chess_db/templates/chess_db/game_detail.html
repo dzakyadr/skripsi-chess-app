@@ -290,16 +290,7 @@
         }
     });
 
-    searchFenBtn.addEventListener("click", () => {
-        let currentFen = "";
-        if (validMoveData[idx]) {
-            currentFen = validMoveData[idx].fen;
-        } else {
-            currentFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-        }
-        const fenPositionOnly = currentFen.split(" ")[0];
-        window.location.href = "{% url 'game_list' %}?fen=" + encodeURIComponent(fenPositionOnly);
-    });
+    
 
     renderMoveList();
     setIndex(0);
