@@ -189,16 +189,15 @@
     async function fetchStats() {
         const currentFen = game.fen();
         const tbody = document.getElementById('statsTableBody'); 
-        // Update UI FEN
+        
         document.getElementById('fenInput').value = currentFen;
         updateInfoUI();        
         updateBreadcrumbs();
         
-        // Ambil nilai filter saat ini
         const opponent = opponentFilterInput ? opponentFilterInput.value : "";
         const color = colorFilterInput ? colorFilterInput.value : "";
 
-        // Panggil Backend API
+        //buat eco dan name opening
         const url = `{% url 'api_opening_stats' %}?fen=${encodeURIComponent(currentFen)}&opponent=${encodeURIComponent(opponent)}&color=${encodeURIComponent(color)}`;
         try {
             const response = await fetch(url);
@@ -206,11 +205,10 @@
             renderTable(data.stats);
 
             if (data.opening) {
-                // Update Kode ECO (Badge Kuning)
+                
                 const ecoBadge = document.getElementById('ecoCode');
                 if(ecoBadge) ecoBadge.textContent = data.opening.code;
 
-                // Update Nama (Teks Putih)
                 const nameText = document.getElementById('openingName');
                 if(nameText) nameText.textContent = data.opening.name;
             }
@@ -218,13 +216,12 @@
             console.error('Error fetching stats:', error);
         }
         
-        // Update juga URL browser (tanpa reload) agar bisa di-share/back
         const newUrl = new URL(window.location);
         newUrl.searchParams.set('fen', currentFen);
         window.history.pushState({}, '', newUrl);
     }
 
-    // --- FUNGSI UPDATE JEJAK LANGKAH (BREADCRUMBS) ---
+    //jejak langkah (breadcrumbs)
     function updateBreadcrumbs() {
         const history = game.history();
         const breadcrumbsDiv = document.getElementById('breadcrumbs');
@@ -238,11 +235,10 @@
         
         let html = '';
         history.forEach((move, i) => {
-            // Tambahkan nomor langkah setiap 2 gerakan (langkah putih)
             if (i % 2 === 0) {
-                html += `<span class="text-muted ms-2 small">${Math.floor(i/2) + 1}.</span>`;
+                html += `<span class="text-white ms-2 small">${Math.floor(i/2) + 1}.</span>`;
             }
-            // Tampilkan notasi langkah (SAN)
+
             html += `<span class="badge bg-secondary ms-1 border border-secondary text-white">${move}</span>`;
         });
         
@@ -252,16 +248,11 @@
     function updateInfoUI() {
         const statusEl = document.getElementById("moveStatusText");
         if (statusEl) {
-            // Ambil data dari chess.js
-            // game.turn() -> 'w' atau 'b'
-            const turnColor = game.turn() === 'w' ? "White" : "Black";
             
-            // Ambil nomor langkah dari FEN (elemen terakhir string FEN)
-            // FEN: rnbqk... - 0 1  <-- Angka 1 di akhir adalah move number
+            const turnColor = game.turn() === 'w' ? "White" : "Black";
             const fenParts = game.fen().split(' ');
             const moveNum = fenParts[5]; 
 
-            // Update Teks
             statusEl.textContent = `Move ${moveNum} — ${turnColor} To Move`;
         }
 
@@ -270,22 +261,21 @@
 
         if (tableHeader) {
             if (history.length === 0) {
-                // Belum ada langkah (Posisi Awal)
+                //belum ada langkah (Posisi Awal)
                 tableHeader.innerHTML = `OPENING STATISTICS`;
             } else {
-                // Sudah ada langkah
+                //sudah ada langkah
                 tableHeader.innerHTML = `MOVE STATISTICS`;
             }
         }
     }
 
-    // --- RENDER TABEL ---
+    //render tabel statistik
     function renderTable(stats) {
-        // Pastikan di HTML kamu tabelnya punya <tbody id="statsTableBody">
         const tbody = document.getElementById('statsTableBody'); 
         if (!tbody) return;
         
-        tbody.innerHTML = "";
+        tbody.innerHTML = ""; 
 
         if (stats.length === 0) {
             tbody.innerHTML = '<tr><td colspan="5" class="py-4 text-muted">Tidak ada data langkah di posisi ini.</td></tr>';
@@ -293,7 +283,7 @@
         }
 
         stats.forEach(row => {
-            // Hitung Persentase
+            //hitung Persentase
             const winPct = Math.round((row.wins / row.total) * 100);
             const drawPct = Math.round((row.draws / row.total) * 100);
             const lossPct = Math.round((row.losses / row.total) * 100);
@@ -302,7 +292,7 @@
             tr.style.cursor = 'pointer';
             tr.onclick = () => makeMove(row.move); // Klik baris -> Jalan di papan
             
-            // Render Baris Tabel (Sesuai desainmu)
+            // Render Baris Tabel
             tr.innerHTML = `
                 <td class="text-start ps-3"><span class="fw-bold text-white font-monospace fs-6">${row.move}</span></td>
                 <td class="fw-bold text-white-50">${row.total}</td>
@@ -318,7 +308,6 @@
         });
     }
 
-    // --- INTERAKSI ---
     
     // 1. Jalan dari Klik Tabel
     window.makeMove = (san) => {
@@ -338,14 +327,12 @@
              const opponent = opponentFilterInput ? opponentFilterInput.value : "";
              const color = colorFilterInput ? colorFilterInput.value : "";
              
-             // Redirect ke Game List
              const url = "{% url 'game_list' %}?fen=" + encodeURIComponent(fen) + "&q=" + encodeURIComponent(opponent);
              window.location.href = url;
         });
     }
 
-    // INIT PERTAMA KALI
-    // Panggil fetchStats() untuk mengisi tabel saat pertama buka
+
     fetchStats(); 
 
     function updateNavButtons() {
@@ -357,15 +344,14 @@
     document.getElementById("btnPrev").addEventListener("click", () => {
         const move = game.undo();
         if (move) {
-            redoStack.push(move); // Simpan masa depan
+            redoStack.push(move); //simpan langkah ke redo stack
             board.setPosition(game.fen());
             fetchStats(); // Update statistik posisi sebelumnya
             updateNavButtons();
-            updateBreadcrumbs(); // (Jika kamu pakai breadcrumbs)
+            updateBreadcrumbs(); 
         }
     });
 
-    // 2. TOMBOL NEXT (Maju - Hanya Redo)
     document.getElementById("btnNext").addEventListener("click", () => {
         if (redoStack.length > 0) {
             const move = redoStack.pop();
@@ -377,15 +363,13 @@
         }
     });
 
-    // 3. TOMBOL START (Reset Total)
+    //TOMBOL START (Reset Total)
     document.getElementById("btnStart").addEventListener("click", () => {
         // Mundur sampai habis
         while (game.undo()) { 
-            // Opsional: Simpan ke redoStack kalau mau bisa di-redo semua
-            // redoStack.push(game.undo()); 
         }
         game.reset();
-        redoStack = []; // Atau kosongkan redo biar bersih
+        redoStack = []; 
         board.setPosition(game.fen());
         fetchStats();
         updateNavButtons();

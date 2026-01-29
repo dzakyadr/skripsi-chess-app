@@ -175,16 +175,12 @@
         const ecoBadge = document.getElementById('ecoBadge');
         const nameEl = document.getElementById('openingName');
         
-        // Jangan ada board.setPosition atau fetchOpeningName() di sini!
-        
-        // Panggil API
         const url = `{% url 'api_identify_opening' %}?fen=${encodeURIComponent(fen)}`;
         
         try {
             const response = await fetch(url);
             if (response.ok) {
                 const data = await response.json();
-                // Update Tampilan jika elemen ada
                 if (ecoBadge) ecoBadge.textContent = data.eco;
                 if (nameEl) nameEl.textContent = data.name;
             }
@@ -193,26 +189,17 @@
         }
     }
 
-
-    // --- LOGIKA LOAD (START FROM 0) ---
     if (initialPgn) {
         try { 
-            // Load untuk menghafal
             game.loadPgn(initialPgn); 
-            // Simpan semua langkah game asli ke array
             mainLineMoves = game.history(); 
             
-            // Reset untuk mulai dari awal (atau FEN tertentu)
-            // Kita pakai teknik rewind yang kemarin
             if (initialFen && initialFen !== "start") {
                 const targetFenBase = initialFen.split(" ")[0];
                 while (game.fen().split(" ")[0] !== targetFenBase) {
                     if (!game.undo()) break;
                 }
-                // Isi redoStack agar tombol Next jalan
-                // (Tapi redoStack ini akan hilang kalau kita buat variasi, 
-                //  makanya kita butuh mainLineMoves sebagai cadangan abadi)
-                 // Trick: Re-play history dari mainLineMoves nanti
+            
             } else {
                 game.reset();
             }
@@ -223,7 +210,7 @@
         game.reset();
     }
 
-    // INIT BOARD
+    //BOARD
     const board = new Chessboard(container, {
         position: game.fen(),
         assetsUrl: "{% static 'assets/' %}", 
@@ -236,7 +223,7 @@
         responsive: true
     });
 
-    // --- UPDATE UTAMA (PAPAN + STOCKFISH + TABEL) ---
+    //UPDATE (PAPAN + STOCKFISH + TABEL)
     function updateBoardAndAI() {
         const currentFen = game.fen();
         
@@ -263,9 +250,9 @@
 
     function checkMainLineStatus() {
         const currentHistory = game.history();
-        const moveIndex = currentHistory.length; // Langkah ke berapa kita sekarang
+        const moveIndex = currentHistory.length; 
 
-        // Cek apakah sejarah kita saat ini SAMA PERSIS dengan awal game asli?
+        //cek apakah masih di main line
         let match = true;
         for(let i=0; i<moveIndex; i++) {
             if (currentHistory[i] !== mainLineMoves[i]) {
@@ -280,11 +267,9 @@
         let turnText = (game.turn() === 'w' ? "White" : "Black") + " to move";
         
         if (isMainLine && moveIndex < mainLineMoves.length) {
-            // KITA DI JALUR ASLI -> Tampilkan Langkah Selanjutnya
             const nextMove = mainLineMoves[moveIndex];
             statusEl.innerHTML = `${turnText} | <span class="text-warning cursor-pointer" onclick="playMainMove('${nextMove}')">Original Movement: <b>${nextMove}</b></span>`;
         } else if (!isMainLine) {
-            // KITA MELENCENG -> Tampilkan Info Variasi
             statusEl.innerHTML = `${turnText} | <span class="text-info">Analysis Mode</span>`;
         } else {
             statusEl.textContent = turnText;
@@ -294,7 +279,7 @@
         if (game.isGameOver()) statusEl.innerHTML = "<span class='text-danger'>GAME OVER</span>";
     }
 
-    // --- FUNGSI RENDER TABEL MOVE LIST ---
+    //render move list table
     function renderMoveListTable() {
         const tbody = document.getElementById("moveTableBody");
         if (!tbody) return;
@@ -312,15 +297,11 @@
             numTd.className = "text-white-50 small border-secondary";
             numTd.textContent = num;
             row.appendChild(numTd);
-
-            // Logic Warna Move List
-            // Kalau langkah ini SAMA dengan Main Line -> Warna Normal
-            // Kalau BEDA (Variasi) -> Warna Biru/Tanda Khusus
             
             const wTd = document.createElement("td");
             wTd.textContent = white.san;
             wTd.className = "cursor-pointer border-secondary text-white py-2";
-            // Cek apakah langkah ini menyimpang?
+            
             if (mainLineMoves[i] !== white.san) wTd.classList.add("text-info", "fw-bold"); 
             wTd.onclick = () => jumpTo(i);
             row.appendChild(wTd);
@@ -342,8 +323,6 @@
 
     // Fungsi Jump sederhana (Replay dari awal sampai target)
     function jumpTo(targetIdx) {
-        // Karena history di chess.js itu read-only, cara paling aman loncat adalah:
-        // Reset -> Mainkan ulang history yang ada di tabel sampai index target
         const targetHistory = game.history(); 
         game.reset();
         for (let i = 0; i <= targetIdx; i++) {
@@ -354,11 +333,11 @@
 
     window.playMainMove = (san) => {
         game.move(san);
-        redoStack = []; // Reset redo karena kita mengikuti jalur utama manual
+        redoStack = []; 
         updateBoardAndAI();
     }
 
-    // --- NAVIGASI TOMBOL ---
+    //navigasi tombol
     document.getElementById("btnPrev").addEventListener("click", () => {
         const move = game.undo();
         if (move) { redoStack.push(move); updateBoardAndAI(); }
@@ -366,7 +345,7 @@
     });
 
     document.getElementById("btnNext").addEventListener("click", () => {
-        // Prioritas 1: Ambil dari Redo Stack (kalau user habis undo)
+        
         if (redoStack.length > 0) {
             game.move(redoStack.pop());
             updateBoardAndAI();
@@ -374,7 +353,7 @@
             return;
         }
 
-        // Prioritas 2: Kalau Redo kosong, tapi kita di Main Line, ambil dari Main Line!
+        
         if (isMainLine) {
             const nextMoveIndex = game.history().length;
             if (nextMoveIndex < mainLineMoves.length) {
@@ -393,7 +372,6 @@
     });
 
     document.getElementById("btnEnd").addEventListener("click", () => {
-        // Maju mentok ke akhir MAIN LINE (bukan variasi)
         if (mainLineMoves.length > 0) {
             game.reset();
             mainLineMoves.forEach(m => game.move(m));
@@ -408,7 +386,7 @@
         board.setOrientation(board.getOrientation() === 'w' ? 'b' : 'w');
     });
 
-    
+    //STOCKFISH INTEGRATION
     var currentMoves = {};
     stockfish.onmessage = function(event) {
     var line = event.data;
@@ -420,22 +398,19 @@
             var from = move.substring(0, 2);
             var to = move.substring(2, 4);
 
-            // 1. Hapus panah lama
-            if (board.clearArrows) board.clearArrows();
-            
-            // 2. Gambar SATU panah hijau (Ringan & Jelas)
+            if (board.clearArrows) board.clearArrows();            
             try {
                 board.addArrow({class: "arrow-success"}, from, to);
             } catch(e) {}
         }
     }
 
-    // --- BAGIAN 2: EVALUASI (Sesuai Code Lama Kamu) ---
+   //eval score
     if (line.includes('score cp')) {
         const match = line.match(/score cp (-?\d+)/);
         if (match) {
             let score = parseInt(match[1]);
-            // Pastikan variabel 'game' (chess.js) bisa diakses di sini
+
             if (typeof game !== 'undefined' && game.turn() === 'b') score = -score;
             
             const evalText = document.getElementById("evalScore");
@@ -449,61 +424,47 @@
         }
     }
 };
-    // --- FUNGSI GAMBAR ULANG PANAH MULTI-PV ---
+    //arrow stockfish 
     function renderMultiArrows() {
-    // 1. Hapus panah lama (Wajib, kalau tidak nanti numpuk)
+    //Hapus panah lama
     try {
         if (board.clearArrows) board.clearArrows(); 
-        // Atau jika librarymu pakai removeArrows:
-        // board.removeArrows();
     } catch(e) {}
 
-    // 2. Loop data langkah yang sudah disimpan
     for (const [rank, move] of Object.entries(currentMoves)) {
         if (!move) continue;
 
         const from = move.substring(0, 2);
         const to = move.substring(2, 4);
-
-        // 3. Tentukan Warna Berdasarkan Ranking
-        // Rank 1 = Hijau (Success), Rank 2 = Biru (Primary), Rank 3 = Kuning (Warning)
         let customClass = "arrow-success"; 
         if (rank == 2) customClass = "arrow-primary"; 
         if (rank == 3) customClass = "arrow-warning"; 
 
-        // 4. Gambar Panah
         try {
-            // Kita pakai format object {class: ...} agar lebih fleksibel
             board.addArrow({class: customClass}, from, to);
         } catch(e) {
             console.error("Gagal gambar panah:", e);
         }
     }
 }
-    // Fungsi ini WAJIB dipanggil setiap kali papan berubah (Next/Prev/Move)
-// Variable untuk menyimpan timer agar tidak tumpang tindih
+    
 var engineTimer = null;
 
 function updateEngine() {
-    // 1. Hapus panah lama segera biar UI responsif
+    //Hapus panah lama segera biar UI responsif
     if (board.clearArrows) board.clearArrows();
     
-    // 2. Stop engine dulu
     stockfish.postMessage("stop");
 
-    // 3. Batalkan timer sebelumnya jika user klik tombol barbar (cepat banget)
+    //Batalkan timer sebelumnya jika user klik tombol barbar (cepat banget)
     if (engineTimer) clearTimeout(engineTimer);
-
-    // 4. Tunda perintah 'go' selama 250ms agar animasi papan selesai dulu
     engineTimer = setTimeout(function() {
         var currentFen = game.fen();
         stockfish.postMessage("position fen " + currentFen);
-        
-        // Depth 15 cukup, kalau mau lebih cepat muncul panahnya turunkan ke 10 atau 12
         stockfish.postMessage("go depth 15"); 
     }, 250); 
 }
-    // --- DRAG & DROP ---
+    //drag and drop handling
     board.enableMoveInput((event) => {
         switch (event.type) {
             case INPUT_EVENT_TYPE.moveInputStarted:
@@ -521,18 +482,17 @@ function updateEngine() {
                         if (result && result.piece) {
                             const move = game.move({ from: event.squareFrom, to: event.squareTo, promotion: result.piece[1] });
                             if (move) { 
-                                redoStack = []; // CABANG BARU -> Hapus masa depan
+                                redoStack = []; 
                                 updateBoardAndAI(); 
                             } else board.setPosition(game.fen(), true);
                         } else board.setPosition(game.fen(), true);
                     });
                     return false;
                 }
-                // Normal
                 try {
                     const move = game.move({ from: event.squareFrom, to: event.squareTo });
                     if (move) {
-                        redoStack = []; // CABANG BARU -> Hapus masa depan
+                        redoStack = []; 
                         updateBoardAndAI();
                         return true; 
                     }
@@ -540,19 +500,15 @@ function updateEngine() {
                 return false; 
         }
     });
-    // Logika untuk mengisi Hidden Input PGN sebelum form dikirim
+    //save game
     document.getElementById('formSaveAnalysis').addEventListener('submit', function(e) {
-    // Ambil string PGN dari object game chess.js
     var currentPGN = game.pgn(); 
     
-    // Masukkan ke dalam input tersembunyi
     document.getElementById('hiddenPgnInput').value = currentPGN;
     
-    // Form lanjut dikirim ke Django...
 });
 
-    // START
-    stockfish.postMessage('uci');
+    stockfish.postMessage('uci')                                                                 ;
     stockfish.postMessage("isready");
     updateBoardAndAI();
 </script>

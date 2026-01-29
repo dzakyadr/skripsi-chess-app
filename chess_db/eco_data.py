@@ -11,16 +11,13 @@ ECO_FILES = ['ecoA.json', 'ecoB.json', 'ecoC.json', 'ecoD.json', 'ecoE.json']
 ECO_DICT = {}
 
 def load_eco_database():
-    """
-    Membaca 5 file ECO (A-E) dan menggabungkannya ke dalam satu kamus.
-    Mendukung format LIST ([...]) maupun DICTIONARY ({...}).
-    """
+    
     global ECO_DICT
     ECO_DICT = {} # Reset
 
     total_loaded = 0
     
-    print("📂 Memulai proses muat Database ECO (A-E)...")
+    print(" Memulai proses muat Database ECO (A-E)...")
 
     for filename in ECO_FILES:
         file_path = os.path.join(BASE_DIR, filename)
@@ -34,11 +31,10 @@ def load_eco_database():
                 data = json.load(f)
                 count_file = 0
 
-                # --- SKENARIO 1: FORMAT DICTIONARY ---
-                # Struktur: { "FEN_STRING": { "eco": "A00", "name": "..." }, ... }
+                
                 if isinstance(data, dict):
                     for fen_key, info in data.items():
-                        # Ambil FEN dari Key
+                        
                         board_fen = fen_key.split(' ')[0]
                         
                         code = info.get('eco', '')
@@ -47,8 +43,7 @@ def load_eco_database():
                         ECO_DICT[board_fen] = (code, name)
                         count_file += 1
 
-                # --- SKENARIO 2: FORMAT LIST ---
-                # Struktur: [ { "fen": "...", "eco": "A00", "name": "..." }, ... ]
+                
                 elif isinstance(data, list):
                     for item in data:
                         fen_raw = item.get('fen', '')
@@ -61,10 +56,10 @@ def load_eco_database():
                             count_file += 1
                 
                 total_loaded += count_file
-                print(f"   ✅ {filename}: {count_file} data dimuat.")
+                print(f"    {filename}: {count_file} data dimuat.")
                 
         except Exception as e:
-            print(f"   ❌ Error membaca {filename}: {e}")
+            print(f"    Error membaca {filename}: {e}")
 
     print(f"🏁 SELESAI. Total {total_loaded} variasi opening siap digunakan.")
 
@@ -72,10 +67,8 @@ def load_eco_database():
 load_eco_database()
 
 def get_opening_name(fen):
-    """
-    Mencari nama opening berdasarkan FEN.
-    """
-    # Potong FEN, ambil posisi bidak saja
+    
+
     board_fen = fen.split(' ')[0]
     
     if board_fen in ECO_DICT:

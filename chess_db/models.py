@@ -33,17 +33,14 @@ class Game(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+#Buat representasi string yang mudah dibaca
     def __str__(self):
         date_str = self.game_date.strftime('%Y-%m-%d') if self.game_date else '????'
-        return f"{self.white_player} vs {self.black_player} ({date_str})"
+        return f"{self.white_player} vs {self.black_player} ({date_str})" #f dari python 3.6 biar gampang format string
 
     class Meta:
         ordering = ['-game_date']
-        
-
-
-class Meta:
-    indexes = [
+        indexes = [ #index biar cepet cari
         models.Index(fields=['white_player']),
         models.Index(fields=['black_player']),
         models.Index(fields=['event']),
@@ -56,7 +53,7 @@ class PlayerProfile(models.Model):
     def __str__(self):
         return self.name
 
-# 3. MODEL ALIAS (INI JUGA)
+
 class PlayerAlias(models.Model):
     profile = models.ForeignKey(PlayerProfile, on_delete=models.CASCADE, related_name='aliases')
     username = models.CharField(max_length=100, help_text="Username di PGN (misal: DrNykterstein)")

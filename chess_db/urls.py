@@ -1,5 +1,3 @@
-# Di dalam chess_db/urls.py
-
 from django.urls import path
 from . import views
 

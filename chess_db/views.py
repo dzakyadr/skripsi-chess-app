@@ -15,67 +15,60 @@ from .models import Game, PlayerProfile, PlayerAlias
 from .eco_data import get_opening_name 
 from datetime import datetime
 
+#Upload PGN
 def upload_pgn(request):
     if request.method == 'POST':
         form = UploadPgnForm(request.POST, request.FILES)
         if form.is_valid():
             pgn_file = request.FILES['pgn_file']
-            
-            # --- [LANGKAH 1] CEK EKSTENSI MANUAL (Biar ga lolos rename) ---
-            # Kita paksa cek akhiran file. Jika bukan .pgn, langsung tendang.
-            filename = pgn_file.name.lower()
+            # CEK FORMAT
+            filename = pgn_file.name.lower() #biar .PGN juga bisa 
             if not filename.endswith('.pgn'):
                 messages.warning(
                     request, "File PGN tidak valid atau tidak berisi permainan.")
-                return redirect('game_list') # Redirect ke list biar kerasa feedbacknya
-
-            # --- [LANGKAH 2] SANITASI CRASH & DECODE ---
+                return redirect('game_list')
             try:
-                # errors='ignore' biar karakter aneh ga bikin stop
-                # replace('\x00', '') biar database ga crash (PENTING!)
                 raw_text = pgn_file.read().decode('utf-8', errors='ignore').replace('\x00', '')
+                #decode dengan 'ignore' untuk menghindari error karakter 
+                #replace untuk jaga-jaga ada null byte biar db tidak error
             except Exception as e:
                 messages.error(request, "File rusak atau tidak terbaca.")
                 return redirect('game_list')
 
-            pgn_io = io.StringIO(raw_text)
+            pgn_io = io.StringIO(raw_text) #untuk dibaca python-chess 
             games_processed_count = 0
 
-            # --- INI KITA KEMBALIKAN: while loop agar bisa baca BANYAK game ---
             while True:
                 try:
-                    # Kita baca game satu per satu dari file
                     game_obj = chess.pgn.read_game(pgn_io)
                 except Exception as e:
                     messages.error(request, f"Error saat parsing PGN: {e}")
-                    break  # Hentikan jika ada error di file
+                    break  # berhenti jika ada error di file
 
                 if game_obj is None:
                     break  # Berhenti jika sudah tidak ada game lagi
 
                 headers = game_obj.headers
 
-                # --- Perbaikanmu yang bagus: Parsing ELO yang aman ---
                 white_elo = int(headers.get('WhiteElo', 0)) if headers.get(
                     'WhiteElo', '').isdigit() else None
                 black_elo = int(headers.get('BlackElo', 0)) if headers.get(
                     'BlackElo', '').isdigit() else None
 
-                # --- Perbaikanmu yang bagus: Parsing Tanggal yang aman ---
-                game_date = None
+                game_date = None #none biar dicari di pgn dl
                 date_str = headers.get('Date', '')
                 try:
                     if date_str and '.' in date_str:
                         parts = date_str.split('.')
                         year = int(parts[0]) if parts[0].isdigit(
-                        ) else 1970  # Default jika '????'
+                        ) else 1970 
                         month = int(parts[1]) if len(
                             parts) > 1 and parts[1].isdigit() else 1
                         day = int(parts[2]) if len(
                             parts) > 2 and parts[2].isdigit() else 1
                         game_date = datetime(year, month, day).date()
                 except Exception:
-                    pass  # Biarkan game_date tetap None jika error
+                    pass 
 
                 # Simpan game ke database
                 g = Game.objects.create(
@@ -87,12 +80,8 @@ def upload_pgn(request):
                     black_player=headers.get('Black', 'Unknown'),
                     white_elo=white_elo,
                     black_elo=black_elo,
-                    # Cocokkan dengan model 'choices'
                     result=headers.get('Result', '*'),
-
-                    # --- Ini kita perbaiki: simpan PGN per game, BUKAN file mentah ---
                     pgn=str(game_obj),
-
                     eco_code=headers.get('ECO', ''),
                     opening=headers.get('Opening', ''),
                 )
@@ -100,38 +89,36 @@ def upload_pgn(request):
 
             if games_processed_count > 0:
                 messages.success(
-                    request, f"Sukses! Berhasil mengimpor {games_processed_count} permainan.")
+                    request, f"Berhasil upload {games_processed_count} permainan.")
             else:
                 messages.warning(
                     request, "File PGN tidak valid atau tidak berisi permainan.")
 
-            # --- Perbaikanmu yang bagus: redirect ke daftar game ---
             return redirect('game_list')
 
-    else:  # Ini adalah request GET (pertama kali buka halaman)
+    else:  
         form = UploadPgnForm()
     return render(request, 'chess_db/upload_pgn.html', {'form': form})
 
+#game list
 def game_list(request):
     qs = Game.objects.all()
 
-    # --- HELPER: SMART ALIAS SEARCH (Code Baru ini penting) ---
     def get_aliases(name_query):
-        """Mencari nama asli + semua username alternatifnya"""
         names = {name_query}
-        # Cari di database Profil yang cocok dengan nama ATAU username
         profiles = PlayerProfile.objects.filter(
             Q(name__icontains=name_query) | 
             Q(aliases__username__icontains=name_query)
+            #icontains i hurus besar kecil sama contains yg mengandung
         ).distinct()
         
         for prof in profiles:
-            names.add(prof.name) # Masukkan nama asli
+            names.add(prof.name)
             for alias in prof.aliases.all():
-                names.add(alias.username) # Masukkan semua akun lain (chess.com, lichess)
+                names.add(alias.username)
         return names
 
-    # --- 1. FILTER POSISI (FEN) ---
+    #filter posisi fen dari openings explorer
     fen_query = request.GET.get('fen', '').strip()
     if fen_query and fen_query != 'start':
         matching_ids = []
@@ -157,14 +144,12 @@ def game_list(request):
                 continue
         qs = qs.filter(id__in=matching_ids)
 
-    # --- 2. ADVANCED FILTERS (Dari Form Advanced) ---
-    # Filter Pemain Spesifik (Kolom White/Black di Advanced Search)
+    #advanced search
     white_filter = request.GET.get('white', '').strip()
     black_filter = request.GET.get('black', '').strip()
     ignore_color = request.GET.get('ignore_color')
 
     if white_filter:
-        # Cari 'white_filter' beserta aliasnya
         aliases = get_aliases(white_filter)
         q_obj = Q()
         for name in aliases:
@@ -181,7 +166,7 @@ def game_list(request):
             q_obj |= Q(black_player__icontains=name)
         qs = qs.filter(q_obj)
 
-    # Filter Metadata Lain
+    #filter metadata
     result = request.GET.get('result')
     if result: qs = qs.filter(result=result)
     
@@ -198,34 +183,29 @@ def game_list(request):
     if eco: qs = qs.filter(eco_code__icontains=eco)
 
 
-    # --- 3. SEARCH GENERAL (FIXED) ---
-    
+    #fitur pencarian
     q = request.GET.get('q', '').strip()
     if q:
        
         aliases = get_aliases(q)
-        
-        # B. Bikin Query Besar
         search_query = Q()
-        
         # 1. Cek Nama Pemain (White ATAU Black)
         for name in aliases:
             search_query |= Q(white_player__icontains=name) | Q(black_player__icontains=name)
-            
         # 2. Cek Metadata (Event, Site, Opening, ECO)
         search_query |= Q(event__icontains=q) | Q(site__icontains=q) | Q(eco_code__icontains=q) | Q(opening__icontains=q)
-        
-        # Terapkan Filter
         qs = qs.filter(search_query)
 
-    # --- 4. SORTING & PAGINATION ---
+    #sorting
     sort_param = request.GET.get('sort', 'newest')
     sort_options = {
         'newest': '-game_date',
         'oldest': 'game_date',
         'white_az': 'white_player',
         'black_az': 'black_player',
-        'elo_high': '-white_elo',
+        'white_za': '-white_player',
+        'black_za': '-black_player',
+        'event_az': 'event',
     }
     qs = qs.order_by(sort_options.get(sort_param, '-game_date'))
 
@@ -251,8 +231,9 @@ def game_list(request):
     
     return render(request, 'chess_db/game_list.html', context)
 
+#analysis board
 def analysis_board(request):
-    # 1. Cek parameter di URL
+
     game_id = request.GET.get('game_id')
     fen_input = request.GET.get('fen')
     
@@ -277,10 +258,10 @@ def analysis_board(request):
     }
     return render(request, 'chess_db/analysis_board.html', context)
 
-# Pastikan import ini ada di bagian paling atas file views.py
+
 from datetime import datetime 
 
-# --- Tambahkan fungsi ini di paling bawah file views.py ---
+
 
 def save_analysis(request):
     if request.method == 'POST':
@@ -312,7 +293,6 @@ def game_detail(request, game_id):
     game = get_object_or_404(Game, pk=game_id)
     
     if request.method == 'POST':
-        # Cek apakah ini POST untuk notes (kita pakai instance=game agar dia meng-update, bukan membuat baru)
         notes_form = GameNotesForm(request.POST, instance=game)
         if notes_form.is_valid():
             notes_form.save()
@@ -322,22 +302,20 @@ def game_detail(request, game_id):
         # Jika cuma melihat, isi form dengan notes yang sudah ada di database
         notes_form = GameNotesForm(instance=game)
 
-    # Kita akan siapkan daftar yang lebih canggih
-    # Isinya bukan cuma FEN, tapi [nomor_langkah, notasi, FEN]
     move_data_list = []
     
     try:
         pgn_io = io.StringIO(game.pgn)
         g = chess.pgn.read_game(pgn_io)
-        board = g.board() # Ini adalah "otak" catur virtual
+        board = g.board()
 
         # 1. Tambahkan POSISI AWAL (index 0)
         move_data_list.append({
             "move_number": "Start",
             "notation": "Posisi Awal",
             "fen": board.fen(),
-            "from": None, # <-- TAMBAHKAN INI
-            "to": None    # <-- TAMBAHKAN INI
+            "from": None, 
+            "to": None   
         })
 
         # 2. Loop semua langkah di PGN
@@ -407,6 +385,7 @@ def game_delete(request, game_id):
     messages.success(request, f"Game '{game_title}' telah berhasil dihapus.")
 
     return redirect('game_list')
+#opening explorer
 def opening_explorer(request):
     # 1. Parameter Filter
     opponent_name = request.GET.get('opponent', '').strip()
@@ -480,13 +459,9 @@ def opening_explorer(request):
                         break
                     game_board.push(move)
             
-            # JIKA POSISI COCOK:
+            
             if found_position:
-                # A. Masukkan ke daftar 'Matching Games' (Batasi 10 saja biar UI gak penuh)
-                #if len(matching_games) < 10:
-                 #   matching_games.append(game)
-
-                # B. Hitung Statistik Langkah Selanjutnya
+                
                 if next_move:
                     move_san = game_board.san(next_move)
                     result = game.result
@@ -515,14 +490,10 @@ def opening_explorer(request):
     return render(request, 'chess_db/opening_explorer.html', context)
 
 def api_opening_stats(request):
-    """
-    API Opening Explorer dengan Fitur SMART ALIASING.
-    """
     fen = request.GET.get('fen', 'start')
     opponent = request.GET.get('opponent', '').strip()
     user_color = request.GET.get('color', '')
 
-    # 1. Setup Papan
     board = chess.Board()
     if fen != 'start':
         try:
@@ -538,34 +509,26 @@ def api_opening_stats(request):
         opening_name = "Unknown Opening"
         eco_code = "-"
 
-    # 2. FILTER GAME (BAGIAN INI KITA UPDATE JADI PINTAR)
     games = Game.objects.all()
 
     if opponent:
-        # --- LOGIKA PENYATUAN AKUN (ALIASING) ---
-        # Langkah A: Cari apakah nama yang diketik user ada di tabel Profil/Alias?
-        # Kita cari Profil yang namanya mirip ATAU punya alias yang mirip input user
+        #(ALIASING)
         profiles = PlayerProfile.objects.filter(
             Q(name__icontains=opponent) | 
             Q(aliases__username__icontains=opponent)
         ).distinct()
 
-        # Langkah B: Kumpulkan semua nama panggilan (Username) yang mungkin
-        target_names = set() # Pakai set biar tidak ada nama dobel
+        target_names = set() 
         
         if profiles.exists():
-            # Kalau ketemu Profil resmi, ambil semua alias-nya
+            
             for prof in profiles:
-                target_names.add(prof.name) # Masukkan nama asli (misal "Dzaky Adrian")
+                target_names.add(prof.name) 
                 for alias in prof.aliases.all():
-                    target_names.add(alias.username) # Masukkan semua alias (vestnik713, dzakuy)
+                    target_names.add(alias.username)
         else:
-            # Kalau tidak ketemu di database alias, ya cari nama itu aja apa adanya
             target_names.add(opponent)
         
-        # Langkah C: Bikin Query Database Game
-        # Kita akan cari game dimana nama pemainnya COCOK dengan SALAH SATU dari target_names
-        # Contoh Query: (White="vestnik713") OR (White="dzakuy") ...
         
         query_player = Q()
         for name in target_names:
@@ -579,19 +542,13 @@ def api_opening_stats(request):
                 # Cari di kedua sisi
                 query_player |= Q(white_player__icontains=name) | Q(black_player__icontains=name)
         
-        # Terapkan filter pintar ini
         games = games.filter(query_player)
 
-    # 3. Hitung Statistik (Sama seperti sebelumnya, tidak berubah)
     target_games = games.order_by('-game_date')[:1000]
     stats_data = {}
     
     for game in target_games:
         try:
-            # Optimasi: Cek string PGN dulu
-            #if root_fen_base not in game.pgn and fen != 'start': 
-             #   continue 
-
             pgn_io = io.StringIO(game.pgn)
             chess_game = chess.pgn.read_game(pgn_io)
             if not chess_game: continue
@@ -630,19 +587,18 @@ def api_opening_stats(request):
     stats_list = sorted(stats_data.values(), key=lambda x: x['total'], reverse=True)
     
     
-    # Kirim juga info nama siapa saja yang dicari (untuk debug/info)
+
     debug_names = list(target_names) if opponent else []
     
     current_board_fen = board.fen() 
     
-    # Panggil fungsi debug tadi
     eco_code, opening_name = get_opening_name(current_board_fen)
-    # ...
+
     
     return JsonResponse({
         'stats': stats_list,
-        'searched_aliases': list(target_names) if opponent else [], # (Kalau kamu pakai logika alias)
-        'opening': {'code': eco_code, 'name': opening_name} # <-- KIRIM DATA INI
+        'searched_aliases': list(target_names) if opponent else [], # (Kalau kamu pakai alias)
+        'opening': {'code': eco_code, 'name': opening_name} #kirim data opening
     })
     
 def advanced_search(request):
@@ -650,12 +606,10 @@ def advanced_search(request):
 
 @require_POST # Hanya boleh diakses lewat tombol submit (POST)
 def game_bulk_delete(request):
-    # Ambil semua ID yang dicentang (nama inputnya 'selected_games')
     game_ids = request.POST.getlist('selected_games')
     
     if game_ids:
-        # Hapus game yang ID-nya ada di dalam list tersebut
-        # delete() di QuerySet itu efisien, langsung hapus banyak sekaligus
+        
         deleted_count, _ = Game.objects.filter(id__in=game_ids).delete()
         
         messages.success(request, f"Berhasil menghapus {deleted_count} game.")
@@ -664,24 +618,20 @@ def game_bulk_delete(request):
         
     return redirect('game_list')
 
-# Pastikan import ini ada
-from .eco_data import get_opening_name
 
+from .eco_data import get_opening_name
+#api identify opening
 def api_identify_opening(request):
-    """
-    API Ringan: Langsung cari nama opening dari string FEN.
-    Tanpa validasi chess.Board() yang ketat agar tidak mudah error.
-    """
     fen = request.GET.get('fen', '').strip()
     
-    # Jika FEN kosong atau 'start', gunakan FEN posisi awal standar
+    #posisi awal
     if not fen or fen == 'start':
         fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
     
-    # Langsung cari di kamus ECO (Fungsi ini sudah aman karena memotong string sendiri)
+    #panggil fungsi dari eco_data.py
     eco_code, opening_name = get_opening_name(fen)
     
-    # Pastikan ada hasil default
+    #hasill default
     if not opening_name:
         eco_code = "-"
         opening_name = "Unknown Opening"
