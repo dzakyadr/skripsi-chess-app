@@ -17,7 +17,8 @@ Including another URLconf
 # config/urls.py
 from django import views
 from django.contrib import admin
-from django.urls import path, include  # <-- Tambahkan 'include'
+from django.urls import path, include 
+from chess_db import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
