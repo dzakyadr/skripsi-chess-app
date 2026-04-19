@@ -20,5 +20,5 @@ from django.urls import path, include  # <-- Tambahkan 'include'
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('chess/', include('chess_db.urls')),  # <-- Tambahkan baris ini
+    path('', include('chess_db.urls')),  # <-- Tambahkan baris ini
 ]
