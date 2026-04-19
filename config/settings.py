@@ -27,6 +27,8 @@ DEBUG = os.getenv('DEBUG') == 'True'
 
 ALLOWED_HOSTS = ["*"]
 
+CSRF_TRUSTED_ORIGINS = ['https://chesstify.onrender.com']
+
 
 # Application definition
 
